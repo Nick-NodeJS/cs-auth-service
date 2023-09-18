@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 actix-rt = "2.9.0"
 actix-web = "4.4.0"
+cs_shared_lib = { path = "./cs_shared_lib" }
 dotenv = "0.15.0"
 env_logger = "0.10.0"
 log = "0.4"
@@ -15,3 +16,4 @@ oauth2 = "4.4.1"
 regex = "1.9.5"
 serde = { version = "1.0", feature = ["derive"]}
 url = "2.4.1"
+redis = "0.16"

@@ -1,8 +1,18 @@
 version: '3'
+
 services:
-  cs-auth-service:
-    build: .
-    env_file:
-      - .env
+
+  redis:
+    image: redis:latest
+    container_name: redis
     ports:
-      - "8080:8080"
+      - "6379:6379"
+
+  # cs-auth-service:
+  #   build: .
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     - redis

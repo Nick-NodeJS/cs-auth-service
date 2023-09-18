@@ -1,4 +1,5 @@
 mod handlers;
+mod redis;
 
 use actix_web::{web, App, HttpResponse, HttpServer};
 
@@ -14,11 +15,9 @@ use crate::app::handlers::google::{
     login::login as login_with_google,
 };
 
-async fn hello() -> HttpResponse {
-    println!("get one!");
-    HttpResponse::Ok().body("Hello from cs-auth-service!\n")
-}
+use crate::app::handlers::health_check::status;
 
+use crate::app::redis::service::RedisService;
 
 /**
  * TODO:
@@ -41,10 +40,21 @@ pub async fn run() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(google_config.clone()))
-            .route("/", web::get().to(hello))
-            .route("/login/google", web::get().to(login_with_google))
-            .route("/callback/google/auth", web::get().to(google_auth_callback))
+            .service(
+                web::scope(format!("/api/{}", app_config.api_version).as_ref())
+                .service(
+                    web::scope("/auth")
+                    .app_data(web::Data::new(google_config.clone()))
+                    .route("/google", web::get().to(login_with_google))
+                    .route("/google/callback", web::get().to(google_auth_callback))
+                )
+                .route("/status", web::get().to(status))
+                // .service(
+                //     web::scope("/users")
+                //     .wrap(authentication_middleware)
+                //     .route("/me", web::get().to(user_profile))
+                // )
+            )
     })
     .bind(server_address_with_port)?
     .run()

@@ -1,4 +1,3 @@
-// src/config.rs
 use serde::Deserialize;
 use dotenv::dotenv;
 
