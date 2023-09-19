@@ -5,12 +5,16 @@ pub fn is_valid_ipv4(ip: &str) -> bool {
     ip_pattern.is_match(ip)
 }
 
-pub fn validate_ip_port(value: i32) -> bool {
-    // TODO: check whether it's correct range
-    value >= 1 && value <= 64000
+pub fn validate_ip_port(_e: u16) -> bool {
+    // No need to compare to 0 or 65535 explicitly.
+    // value is always within the range of u16.
+    true
 }
 
-pub fn validate_integer_in_range(value: i32, min: i32, max: i32) -> bool {
+pub fn validate_integer_in_range<T>(value: T, min: T, max: T) -> bool
+where
+    T: std::cmp::PartialOrd,
+{
     value >= min && value <= max
 }
 

@@ -1,10 +1,14 @@
 mod handlers;
 mod redis;
+mod app_data;
 
-use actix_web::{web, App, HttpResponse, HttpServer};
+use std::sync::{Arc, Mutex};
+
+use actix_web::{web, App, HttpServer};
 
 use log::info;
 use env_logger::Env;
+use crate::app::app_data::AppData;
 use crate::config::{
     app_config::AppConfig,
     google_config::GoogleConfig,
@@ -19,6 +23,7 @@ use crate::app::handlers::health_check::status;
 
 use crate::app::redis::service::RedisService;
 
+
 /**
  * TODO:
  * 1. finish redirect flow
@@ -32,19 +37,24 @@ pub async fn run() -> std::io::Result<()> {
     env_logger::Builder::from_env(Env::default().filter_or("RUST_LOG", "info")).init();
 
     let app_config = AppConfig::new();
-    let google_config = GoogleConfig::new();
 
     info!("Service address {}", app_config.server_address_with_port());
 
     let server_address_with_port = app_config.server_address_with_port();
 
+    // Set AppData to share services, configs etc
+    let app_data = AppData {
+        google_config: GoogleConfig::new(),
+        redis_service: Arc::new(Mutex::new(RedisService::new())),
+    };
+
     HttpServer::new(move || {
         App::new()
+            .app_data(web::Data::new(app_data.clone()))
             .service(
                 web::scope(format!("/api/{}", app_config.api_version).as_ref())
                 .service(
                     web::scope("/auth")
-                    .app_data(web::Data::new(google_config.clone()))
                     .route("/google", web::get().to(login_with_google))
                     .route("/google/callback", web::get().to(google_auth_callback))
                 )

@@ -11,15 +11,15 @@ use cs_shared_lib::{
 pub struct RedisConfig {
   pub redis_address: String,
   pub redis_port: u16,
-  pub redis_database: u8,
+  pub redis_database: u16,
 }
 
 impl RedisConfig {
     pub fn new() -> Self {
       dotenv().ok();
 
-      let redis_address = dotenv::var("REDIS_ADDRESS")
-          .expect("REDIS_ADDRESS environment variable is not set");
+      let redis_address = dotenv::var("REDIS_HOST")
+          .expect("REDIS_HOST environment variable is not set");
 
       // Validate and parse the redis port
       let redis_port = dotenv::var("REDIS_PORT")
@@ -27,7 +27,7 @@ impl RedisConfig {
           .parse()
           .expect("Invalid redis port");
 
-      if !validate_ip_port(&server_port) {
+      if !validate_ip_port(redis_port) {
         panic!("Server port out of the range");
       }
 
@@ -43,7 +43,7 @@ impl RedisConfig {
           .map_err(|_| "Invalid Redis database")
           .expect("Invalid Redis database");
 
-      if !validate_integer_in_range(&redis_database, 0, 15) {
+      if !validate_integer_in_range(redis_database, 0, 15) {
         panic!("Redis database out of the range");
           }
 

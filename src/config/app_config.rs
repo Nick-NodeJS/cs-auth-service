@@ -25,7 +25,7 @@ impl AppConfig {
             .parse()
             .expect("Invalid server port");
         
-        if !validate_ip_port(&server_port) {
+        if !validate_ip_port(server_port) {
             panic!("Server port out of the range");
         }
 
