@@ -49,12 +49,12 @@ pub async fn login(app_data: web::Data<AppData>) -> HttpResponse {
 
     // Set pkce_code_verifier to Redis by key as csrf_state
     let redis_service = &app_data.redis_service.lock().unwrap();
-    if let Err(e) = redis_service.set_value_with_ttl(
+    if let Err(err) = redis_service.set_value_with_ttl(
         csrf_state.secret().as_str(),
          pkce_code_verifier.secret().as_str(),
           config.google_redis_state_ttl_ms as usize,
         ).await {
-            log::error!("REDIS SERVICE ERROR: {}", e);
+            log::error!("REDIS SERVICE ERROR: {}", err);
             return HttpResponse::InternalServerError().body("Service unavailable")//Err(actix_web::error::ErrorInternalServerError(e));
     }
 

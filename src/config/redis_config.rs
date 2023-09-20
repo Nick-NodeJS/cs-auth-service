@@ -38,9 +38,8 @@ impl RedisConfig {
 
       // Validate and parse the redis database
       let redis_database = dotenv::var("REDIS_DATABASE")
-          .unwrap_or_else(|_| "1".to_string())
+          .expect("REDIS_PORT environment variable is not set")
           .parse()
-          .map_err(|_| "Invalid Redis database")
           .expect("Invalid Redis database");
 
       if !validate_integer_in_range(redis_database, 0, 15) {
