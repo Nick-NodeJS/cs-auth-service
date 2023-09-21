@@ -1,5 +1,5 @@
 mod handlers;
-mod redis;
+mod services;
 mod app_data;
 
 use std::sync::{Arc, Mutex};
@@ -21,7 +21,10 @@ use crate::app::handlers::google::{
 
 use crate::app::handlers::health_check::status;
 
-use crate::app::redis::service::RedisService;
+use crate::app::services::{
+    redis::service::RedisService,
+    google::service::GoogleService,
+};
 
 
 /**
@@ -37,6 +40,7 @@ pub async fn run() -> std::io::Result<()> {
     env_logger::Builder::from_env(Env::default().filter_or("RUST_LOG", "info")).init();
 
     let app_config = AppConfig::new();
+    let google_config = GoogleConfig::new();
 
     info!("Service address {}", app_config.server_address_with_port());
 
@@ -44,7 +48,7 @@ pub async fn run() -> std::io::Result<()> {
 
     // Set AppData to share services, configs etc
     let app_data = AppData {
-        google_config: GoogleConfig::new(),
+        google_service: Arc::new(Mutex::new(GoogleService::new(google_config))),
         redis_service: Arc::new(Mutex::new(RedisService::new())),
     };
 

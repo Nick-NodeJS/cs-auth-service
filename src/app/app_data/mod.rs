@@ -1,12 +1,13 @@
 use std::sync::{Mutex, Arc};
 
-use crate::config::google_config::GoogleConfig;
-
-use super::redis::service::RedisService;
+use super::services::{
+  redis::service::RedisService,
+  google::service::GoogleService,
+};
 
 
 #[derive(Clone)]
 pub struct AppData {
-  pub google_config: GoogleConfig,
+  pub google_service: Arc<Mutex<GoogleService>>,
   pub redis_service: Arc<Mutex<RedisService>>,
 }
