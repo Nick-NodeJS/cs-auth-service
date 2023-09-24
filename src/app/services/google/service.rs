@@ -41,7 +41,7 @@ impl GoogleService {
         GoogleService { client, config }
     }
 
-    pub fn get_authorization_url_data(&self) -> (Url, CsrfToken, &str, u32) {
+    pub fn get_authorization_url_data(&self) -> (Url, CsrfToken, String, u32) {
       // Google supports Proof Key for Code Exchange (PKCE - https://oauth.net/2/pkce/).
       // Create a PKCE code verifier and SHA-256 encode it as a code challenge.
       let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
@@ -56,12 +56,12 @@ impl GoogleService {
       return (
         authorize_url,
         csrf_state,
-        pkce_code_verifier.secret().as_str(),
+        pkce_code_verifier.secret().to_string(),
         self.config.google_redis_state_ttl_ms,
       );
     }
 
-    pub fn get_tokens(&self, code: String, pkce_code_verifier: String) -> Result<(&String, &String), String> {
+    pub fn get_tokens(&self, code: String, pkce_code_verifier: String) -> Result<(String, String), String> {
       // Exchange the code with a token.
       match self.client
       .exchange_code(AuthorizationCode::new(code))
@@ -70,7 +70,7 @@ impl GoogleService {
         Ok(token_response) => {
           let access_token = token_response.access_token().secret();
           if let Some(refresh_token) = token_response.refresh_token() {
-            return Ok((access_token, refresh_token.secret()));
+            return Ok((access_token.to_owned(), refresh_token.secret().to_owned()));
           } else {
             return Err("token response doesn't have refresh token".to_string());
           }

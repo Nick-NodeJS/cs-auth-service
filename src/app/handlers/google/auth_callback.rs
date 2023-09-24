@@ -8,7 +8,7 @@ use crate::app::{
   services::redis::service::RedisService,
 };
 
-pub async fn auth_callback(req: HttpRequest, app_data: AppData) -> HttpResponse {
+pub async fn auth_callback(req: HttpRequest, app_data: web::Data<AppData>) -> HttpResponse {
   let redis_service = &app_data.redis_service.lock().unwrap();
   match parse_query_string(req.query_string()) {
       Ok((code, state)) => {
@@ -16,12 +16,13 @@ pub async fn auth_callback(req: HttpRequest, app_data: AppData) -> HttpResponse 
         if let Some(pkce_code_verifier) = get_state_from_cache(state.clone(), redis_service).await {
           let google_service = app_data.google_service.lock().unwrap();
           match google_service.get_tokens(code, pkce_code_verifier) {
-            Ok((access_token, refresh_token)) => {
-              // TODO: put tokens to storage
-              let mut payload = Map::new();
-              payload.insert("access_token".to_string(), Value::String(access_token.to_string()));
-              payload.insert("refresh_token".to_string(), Value::String(refresh_token.to_string()));
-              return HttpResponse::Ok().json(payload);
+            Ok(tokens) => {
+              if let Err(err) = set_user_to_storage(tokens.clone()).await {
+                return google_bad_request_error(
+                  format!("Error to set tokens to storage: {}",err)
+                )
+              }
+              return return_tokens_as_json(tokens);
             },
             Err(err) => {
               return google_bad_request_error(err);
@@ -41,6 +42,24 @@ pub async fn auth_callback(req: HttpRequest, app_data: AppData) -> HttpResponse 
   }
 }
 
+async fn set_user_to_storage(tokens: (String, String)) -> Result<(), String> {
+  /* TODO:
+   - update google service to get OAuth2 cert on initial step(method new)
+   - decode access_token -> token data(google service)
+   - create database service
+   - create new user or update existing user in database
+   - set or update cache with token data
+   */
+  return Ok(())
+}
+
+fn return_tokens_as_json(tokens: (String, String)) -> HttpResponse {
+  let (access_token, refresh_token) = tokens;
+  let mut payload = Map::new();
+  payload.insert("access_token".to_string(), Value::String(access_token));
+  payload.insert("refresh_token".to_string(), Value::String(refresh_token));
+  return HttpResponse::Ok().json(payload);
+}
 async fn get_state_from_cache(
   code: String,
   redis_service: &MutexGuard<'_, RedisService>,
@@ -85,5 +104,5 @@ fn parse_query_string(query_string: &str) -> Result<(String, String), &str> {
 
 fn google_bad_request_error(err: String) -> HttpResponse {
   log::error!("Bad Google request: {}", err);
-  return HttpResponse::BadRequest().body("Bad Google request");
+  return HttpResponse::BadRequest().body("Bad Google request or unable to proccess it");
 }
