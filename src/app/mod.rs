@@ -47,9 +47,17 @@ pub async fn run() -> std::io::Result<()> {
     let server_address_with_port = app_config.server_address_with_port();
 
     // Set AppData to share services, configs etc
+    let mut google_service = GoogleService::new(google_config);
+    if let Err(err) = google_service.init().await {
+        panic!("Error to init Google Service: {}", err.to_string());
+    }
+    let redis_service = match RedisService::new() {
+        Ok(service) => service,
+        Err(err) => panic!("{:?}", err),
+    };
     let app_data = AppData {
-        google_service: Arc::new(Mutex::new(GoogleService::new(google_config))),
-        redis_service: Arc::new(Mutex::new(RedisService::new())),
+        google_service: Arc::new(Mutex::new(google_service)),
+        redis_service: Arc::new(Mutex::new(redis_service)),
     };
 
     HttpServer::new(move || {

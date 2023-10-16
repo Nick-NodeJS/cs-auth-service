@@ -1,3 +1,9 @@
+use actix_web::error::PayloadError;
+use awc::Client;
+use awc::error::SendRequestError;
+use jsonwebtoken as jwt;
+use jwt::{decode, Validation, DecodingKey, Algorithm, TokenData};
+
 use oauth2::url::Url;
 use oauth2::basic::BasicClient;
 use oauth2::{
@@ -5,12 +11,24 @@ use oauth2::{
     RevocationUrl, Scope, TokenUrl, AuthorizationCode, PkceCodeVerifier, TokenResponse,
 };
 use oauth2::reqwest::http_client;
+use serde::{Serialize, Deserialize};
 
 use crate::config::google_config::GoogleConfig;
 
 pub struct GoogleService {
     client: BasicClient,
     config: GoogleConfig,
+    google_oauth2_decoding_key: Option<DecodingKey>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    // Add the fields you need from the token here
+    iss: String,
+    sub: String,
+    aud: String,
+    exp: usize,
+    iat: usize,
 }
 
 impl GoogleService {
@@ -38,7 +56,22 @@ impl GoogleService {
           RevocationUrl::new(config.google_revoke_url.to_string())
               .expect("Invalid revocation endpoint URL"),
       );
-        GoogleService { client, config }
+      let google_oauth2_decoding_key: Option<DecodingKey> = None;
+
+      GoogleService { client, config, google_oauth2_decoding_key }
+    }
+
+    pub async fn init(&mut self) -> Result<(), String> {
+      return Ok(());
+      /*match get_google_oauth2_sert(&self.config.google_cert_url).await {
+        Ok(google_oauth2_decoding_key) => {
+          self.google_oauth2_decoding_key = Some(google_oauth2_decoding_key);
+          return Ok(())
+        },
+        Err(err) => {
+          return Err(format!("Error to get Google OAuth2 sertificate: {}", err));
+        }
+      }*/
     }
 
     pub fn get_authorization_url_data(&self) -> (Url, CsrfToken, String, u32) {
@@ -80,4 +113,50 @@ impl GoogleService {
         },
       };
     }
+
+    pub fn get_access_token_user_data(&self, access_token: &str) -> Result<TokenData<Claims>, String> {
+        // Validation configuration
+        let validation = Validation::new(Algorithm::RS256);
+
+        // Decode the Google access token
+        let decoding_key = match &self.google_oauth2_decoding_key {
+          Some(d_key) => d_key,
+          None => return Err("No decoding key on Google Service!".to_string()),
+        };
+
+        let token_data = match decode(
+            access_token,
+            decoding_key,
+            &validation,
+        ) {
+          Ok(t_data) => t_data,
+          Err(err) => return Err(err.to_string()),
+        };
+
+        Ok(token_data)
+    }
+}
+
+async fn get_google_oauth2_sert(url: &str) -> Result<DecodingKey, String> {
+  // let headers = HeaderMap::new();
+  // let response = request::get(url, headers).await?.json::<serde_json::Value>()?;
+  let client = Client::new();
+  let mut jwks_response = match client.get(url).send().await {
+    Ok(jwks_response_try) => jwks_response_try,
+    Err(err) => return Err(err.to_string()),
+  };
+  let jwks = match jwks_response.json::<serde_json::Value>().await {
+    Ok(jwk_try) => jwk_try,
+    Err(err) => return Err(err.to_string()),
+  };
+  let key = jwks["keys"][0].clone();
+  println!("key {:?}, url: {}", key, url);
+  // Create a decoding key from the selected key
+  return match DecodingKey::from_rsa_components(
+    &key["n"].as_str().unwrap(),
+    &key["e"].as_str().unwrap(),
+  ) {
+    Ok(decoding_key) => Ok(decoding_key),
+    Err(err) => Err(err.to_string()),
+  };
 }

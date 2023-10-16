@@ -4,7 +4,7 @@ use crate::app::app_data::AppData;
 use actix_web::{web, HttpResponse};
 
 pub async fn login(app_data: web::Data<AppData>) -> HttpResponse {
-    let google_service = &app_data.google_service.lock().unwrap();
+    let google_service = app_data.google_service.lock().unwrap();
     // Generate the authorization URL to which we'll redirect the user.
     let (
         authorize_url,
@@ -14,13 +14,19 @@ pub async fn login(app_data: web::Data<AppData>) -> HttpResponse {
     ) = google_service.get_authorization_url_data();
 
     // Set pkce_code_verifier to Redis by key as csrf_state
-    let redis_service = &app_data.redis_service.lock().unwrap();
+    let mut redis_service = match app_data.redis_service.lock() {
+        Ok(service) => service,
+        Err(err) => {
+            log::error!("LOCK REDIS SERVICE ERROR: {:?}", err);
+            return HttpResponse::InternalServerError().body("Service unavailable")
+        },
+    };
     if let Err(err) = redis_service.set_value_with_ttl(
         csrf_state.secret().as_str(),
          &pkce_code_verifier,
           google_redis_state_ttl_ms as usize,
         ).await {
-            log::error!("REDIS SERVICE ERROR: {}", err);
+            log::error!("SET VALUE REDIS SERVICE ERROR: {:?}", err);
             return HttpResponse::InternalServerError().body("Service unavailable")//Err(actix_web::error::ErrorInternalServerError(e));
     }
 

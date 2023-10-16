@@ -1,18 +1,20 @@
-use redis::Client;
-use redis::AsyncCommands;
+use anyhow::Result;
+use redis::{Connection, ConnectionLike, Client};
+//use redis::AsyncCommands;
+use redis::Commands;
 
 use crate::config::redis_config::RedisConfig;
 
 pub struct RedisService {
-    client: Client,
+    connection: Connection,
 }
 
 impl RedisService {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self> {
         let redis_config = RedisConfig::new();
-        let client = Client::open(redis_config.get_redis_url())
-            .expect("Failed to create Redis client");
-        RedisService { client }
+        let client = redis::Client::open(redis_config.get_redis_url())?;
+        let connection = client.get_connection()?;
+        Ok(RedisService { connection })
     }
 
     // For future use
@@ -22,15 +24,16 @@ impl RedisService {
     //     Ok(())
     // }
 
-    pub async fn set_value_with_ttl(&self, key: &str, value: &str, milliseconds: usize) -> Result<(), redis::RedisError> {
-        let mut connection = self.client.get_async_connection().await?;
-        connection.pset_ex(key, value, milliseconds).await?;
+    pub async fn set_value_with_ttl(&mut self, key: &str, value: &str, milliseconds: usize) -> Result<(), redis::RedisError> {
+        //let mut connection  = self.client.get_connection()?;
+        let _:() = self.connection.set_ex(key, value, milliseconds)?;
+        //redis::cmd("SET").arg(key).arg(value).arg("EX").arg(milliseconds).query(connection)?;
         Ok(())
     }
 
-    pub async fn get_value(&self, key: &str) -> Result<Option<String>, redis::RedisError> {
-        let mut connection = self.client.get_async_connection().await?;
-        let value: Option<String> = connection.get(key).await?;
+    pub async fn get_value(&mut self, key: &str) -> Result<Option<String>, redis::RedisError> {
+        //let mut connection = self.client.get_connection()?;
+        let value: Option<String> = self.connection.get(key)?;//redis::cmd("GET").arg(key).query(connection)?;
         Ok(value)
     }
 }

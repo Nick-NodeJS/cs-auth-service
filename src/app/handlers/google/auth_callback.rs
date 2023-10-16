@@ -5,19 +5,31 @@ use actix_web::{HttpRequest, HttpResponse, web};
 
 use crate::app::{
   app_data::AppData,
-  services::redis::service::RedisService,
+  services::{redis::service::RedisService, google::service::GoogleService},
 };
 
 pub async fn auth_callback(req: HttpRequest, app_data: web::Data<AppData>) -> HttpResponse {
-  let redis_service = &app_data.redis_service.lock().unwrap();
+  let rt = app_data.redis_service.clone();
+  let redis_service = match rt.lock() {
+    Ok(service) => service,
+    Err(err) => return google_bad_request_error(err.to_string()),
+  };
   match parse_query_string(req.query_string()) {
       Ok((code, state)) => {
         // process code + state
         if let Some(pkce_code_verifier) = get_state_from_cache(state.clone(), redis_service).await {
-          let google_service = app_data.google_service.lock().unwrap();
+          let redis_service_2 = match app_data.redis_service.lock() {
+            Ok(service) => service,
+            Err(err) => return google_bad_request_error(err.to_string()),
+          };
+          let gs_lock = &app_data.google_service.clone();
+          let google_service = match gs_lock.lock() {
+            Ok(gs) => gs,
+            Err(err) => return google_bad_request_error(err.to_string()),
+          };
           match google_service.get_tokens(code, pkce_code_verifier) {
             Ok(tokens) => {
-              if let Err(err) = set_user_to_storage(tokens.clone()).await {
+              if let Err(err) = set_user_to_storage(&tokens, &google_service, &redis_service_2).await {
                 return google_bad_request_error(
                   format!("Error to set tokens to storage: {}",err)
                 )
@@ -42,7 +54,18 @@ pub async fn auth_callback(req: HttpRequest, app_data: web::Data<AppData>) -> Ht
   }
 }
 
-async fn set_user_to_storage(tokens: (String, String)) -> Result<(), String> {
+async fn set_user_to_storage(
+  tokens: &(String, String),
+  google_service: &MutexGuard<'_, GoogleService>,
+  redis_service: &MutexGuard<'_, RedisService>,
+) -> Result<(), String> {
+  println!("tokens {:?}", tokens);
+  let (access_token, refresh_token) = tokens;
+  let user_data = match google_service.get_access_token_user_data(access_token) {
+      Ok(data) => data,
+      Err(err) => return Err(err.to_string()), 
+  };
+  println!("User data {:?}", user_data);
   /* TODO:
    - update google service to get OAuth2 cert on initial step(method new)
    - decode access_token -> token data(google service)
@@ -62,9 +85,10 @@ fn return_tokens_as_json(tokens: (String, String)) -> HttpResponse {
 }
 async fn get_state_from_cache(
   code: String,
-  redis_service: &MutexGuard<'_, RedisService>,
+  redis_service: MutexGuard<'_, RedisService>,
 ) -> Option<String> {
-    match redis_service.get_value(&code).await {
+  let mut rs = redis_service;
+    match rs.get_value(&code).await {
       Ok(state) => {
         return state;
       },
