@@ -175,6 +175,12 @@ impl GoogleService {
       }
     }
 
+    /// #### Actions:
+    /// 1 - decode user data by tokens (GAPI request)
+    /// 
+    /// 2 - create a new or update user in data storage
+    /// 
+    /// 3 - reflect user in cache
     pub async fn set_user_to_storage(
       &self,
       tokens: &(String, String),
@@ -197,6 +203,24 @@ impl GoogleService {
       return Ok(())
     }
 
+    /// return tokens as json object
+    /// #### Arguments
+    /// 
+    /// * `tokens` - A Tuple of strings
+    /// 
+    /// ```
+    /// (String, String)
+    /// ```
+    /// 
+    /// where tokens\[0\] is access_token and tokens\[1\] is refresh_token
+    /// 
+    /// #### Response example:
+    /// ```
+    ///  {
+    ///   "access_token": "$access_token",
+    ///   "refresh_token": "$refresh_token"
+    ///   }
+    /// ```
     pub fn tokens_as_json(&self, tokens: (String, String)) -> Map<String, Value> {
       let (access_token, refresh_token) = tokens;
       let mut payload = Map::new();
