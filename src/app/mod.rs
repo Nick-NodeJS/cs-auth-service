@@ -6,12 +6,14 @@ use std::sync::{Arc, Mutex};
 
 use actix_web::{web, App, HttpServer};
 
+use cs_shared_lib::redis;
 use log::info;
 use env_logger::Env;
 use crate::app::app_data::AppData;
 use crate::config::{
     app_config::AppConfig,
     google_config::GoogleConfig,
+    redis_config::RedisConfig,
 };
 
 use crate::app::handlers::google::{
@@ -21,10 +23,7 @@ use crate::app::handlers::google::{
 
 use crate::app::handlers::health_check::status;
 
-use crate::app::services::{
-    redis::service::RedisService,
-    google::service::GoogleService,
-};
+use crate::app::services::google::service::GoogleService;
 
 
 /**
@@ -41,6 +40,7 @@ pub async fn run() -> std::io::Result<()> {
 
     let app_config = AppConfig::new();
     let google_config = GoogleConfig::new();
+    let redis_config = RedisConfig::new();
 
     info!("Service address {}", app_config.server_address_with_port());
 
@@ -51,13 +51,13 @@ pub async fn run() -> std::io::Result<()> {
     if let Err(err) = google_service.init().await {
         panic!("Error to init Google Service: {}", err.to_string());
     }
-    let redis_service = match RedisService::new() {
+    let redis_connection = match redis::get_connection(&redis_config.get_redis_url()) {
         Ok(service) => service,
         Err(err) => panic!("{:?}", err),
     };
     let app_data = AppData {
         google_service: Arc::new(Mutex::new(google_service)),
-        redis_service: Arc::new(Mutex::new(redis_service)),
+        redis_connection: Arc::new(Mutex::new(redis_connection)),
     };
 
     HttpServer::new(move || {

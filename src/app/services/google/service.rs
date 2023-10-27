@@ -1,8 +1,14 @@
+use std::collections::HashMap;
+use std::sync::MutexGuard;
+
 use actix_web::error::PayloadError;
+use actix_web::web;
 use awc::Client;
 use awc::error::SendRequestError;
+use cs_shared_lib::redis as Redis;
 use jsonwebtoken as jwt;
 use jwt::{decode, Validation, DecodingKey, Algorithm, TokenData};
+use redis::Connection as RedisConnection;
 
 use oauth2::url::Url;
 use oauth2::basic::BasicClient;
@@ -10,13 +16,14 @@ use oauth2::{
     AuthUrl, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl,
     RevocationUrl, Scope, TokenUrl, AuthorizationCode, PkceCodeVerifier, TokenResponse,
 };
-use oauth2::reqwest::http_client;
+use oauth2::reqwest::async_http_client;
 use serde::{Serialize, Deserialize};
+use serde_json::{Map, Value};
 
 use crate::config::google_config::GoogleConfig;
 
 pub struct GoogleService {
-    client: BasicClient,
+    oauth2_client: BasicClient,
     config: GoogleConfig,
     google_oauth2_decoding_key: Option<DecodingKey>,
 }
@@ -58,7 +65,11 @@ impl GoogleService {
       );
       let google_oauth2_decoding_key: Option<DecodingKey> = None;
 
-      GoogleService { client, config, google_oauth2_decoding_key }
+      GoogleService {
+        oauth2_client: client,
+        config,
+        google_oauth2_decoding_key,
+      }
     }
 
     pub async fn init(&mut self) -> Result<(), String> {
@@ -78,7 +89,7 @@ impl GoogleService {
       // Google supports Proof Key for Code Exchange (PKCE - https://oauth.net/2/pkce/).
       // Create a PKCE code verifier and SHA-256 encode it as a code challenge.
       let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
-      let (authorize_url, csrf_state) = self.client
+      let (authorize_url, csrf_state) = self.oauth2_client
         .authorize_url(CsrfToken::new_random)
         // This example is requesting access to the user's profile.
         .add_scope(Scope::new(
@@ -94,14 +105,15 @@ impl GoogleService {
       );
     }
 
-    pub fn get_tokens(&self, code: String, pkce_code_verifier: String) -> Result<(String, String), String> {
+    pub async fn get_tokens(&self, code: String, pkce_code_verifier: String) -> Result<(String, String), String> {
       // Exchange the code with a token.
-      match self.client
+      match self.oauth2_client
       .exchange_code(AuthorizationCode::new(code))
       .set_pkce_verifier(PkceCodeVerifier::new(pkce_code_verifier))
-      .request(http_client) {
+      .request_async(async_http_client).await {
         Ok(token_response) => {
           let access_token = token_response.access_token().secret();
+          println!("Access token: {:?}", access_token);
           if let Some(refresh_token) = token_response.refresh_token() {
             return Ok((access_token.to_owned(), refresh_token.secret().to_owned()));
           } else {
@@ -111,7 +123,7 @@ impl GoogleService {
         Err(err) => {
           return Err(err.to_string());
         },
-      };
+      }
     }
 
     pub fn get_access_token_user_data(&self, access_token: &str) -> Result<TokenData<Claims>, String> {
@@ -134,6 +146,79 @@ impl GoogleService {
         };
 
         Ok(token_data)
+    }
+
+    pub fn parse_query_string(&self, query_string: &str) -> Result<(String, String), &str> {
+      let try_params = web::Query::<HashMap<String, String>>::from_query(
+        query_string,
+      );
+      match try_params {
+        Ok(params) => {
+          let code: String;
+          if let Some(code_string) = params.get("code") {
+            code = code_string.to_owned();
+          } else {
+            return Err("Invalid code parameter")
+          };
+          let state: String;
+          if let Some(state_string) = params.get("state") {
+            state = state_string.to_owned();
+          } else {
+            return Err("Invalid code parameter")
+          };
+          return Ok((code, state));
+        },
+        Err(err) => {
+          log::error!("{}", err.to_string());
+          return Err("Invalid query string")
+        },
+      }
+    }
+
+    pub async fn set_user_to_storage(
+      &self,
+      tokens: &(String, String),
+      //  redis_connection: MutexGuard<'_, RedisConnection>,
+    ) -> Result<(), String> {
+      println!("tokens {:?}", tokens);
+      let (access_token, refresh_token) = tokens;
+      let user_data = match self.get_access_token_user_data(access_token) {
+          Ok(data) => data,
+          Err(err) => return Err(err.to_string()), 
+      };
+      println!("User data {:?}", user_data);
+      /* TODO:
+       - update google service to get OAuth2 cert on initial step(method new)
+       - decode access_token -> token data(google service)
+       - create database service
+       - create new user or update existing user in database
+       - set or update cache with token data
+       */
+      return Ok(())
+    }
+
+    pub fn tokens_as_json(&self, tokens: (String, String)) -> Map<String, Value> {
+      let (access_token, refresh_token) = tokens;
+      let mut payload = Map::new();
+      payload.insert("access_token".to_string(), Value::String(access_token));
+      payload.insert("refresh_token".to_string(), Value::String(refresh_token));
+      return payload;
+    }
+
+    pub fn get_state_from_cache(
+      &self,
+      code: String,
+      redis_connection: &mut MutexGuard<'_, RedisConnection>,
+    ) -> Option<String> {
+        match Redis::get_value(redis_connection, &code) {
+          Ok(state) => {
+            return state;
+          },
+          Err(err) => {
+            log::error!("REDIS SERVICE ERROR: {}", err);
+            return None;
+          }
+      }
     }
 }
 

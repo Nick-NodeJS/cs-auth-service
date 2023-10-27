@@ -11,6 +11,7 @@ pub fn validate_ip_port(_e: u16) -> bool {
   true
 }
 
+/// provide integer validation in given range
 pub fn validate_integer_in_range<T>(value: T, min: T, max: T) -> bool
 where
   T: std::cmp::PartialOrd,
