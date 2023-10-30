@@ -1,7 +1,7 @@
 // src/config.rs
 use serde::Deserialize;
 use dotenv::dotenv;
-use cs_shared_lib::{
+use cs_shared_lib::validation::{
   is_valid_ipv4,
   validate_ip_port,
   validate_integer_in_range,

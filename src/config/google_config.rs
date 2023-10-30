@@ -1,4 +1,4 @@
-use cs_shared_lib::validate_integer_in_range;
+use cs_shared_lib::validation::validate_integer_in_range;
 use serde::Deserialize;
 use dotenv::dotenv;
 

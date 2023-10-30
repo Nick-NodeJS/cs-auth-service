@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use dotenv::dotenv;
-use cs_shared_lib::{ is_valid_ipv4, validate_ip_port };
+use cs_shared_lib::validation::{ is_valid_ipv4, validate_ip_port };
 
 #[derive(Deserialize, Clone)]
 pub struct AppConfig {

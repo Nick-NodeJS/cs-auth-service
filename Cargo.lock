@@ -520,6 +520,7 @@ dependencies = [
 name = "cs_shared_lib"
 version = "0.1.0"
 dependencies = [
+ "redis",
  "regex",
 ]
 
