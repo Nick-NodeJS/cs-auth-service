@@ -1,11 +1,22 @@
 use cs_shared_lib::redis;
 use serde_json::{Map, Value};
-use crate::app::app_data::AppData;
+use crate::app::{app_data::AppData, app_error::AppError};
 
 use actix_web::{web, HttpResponse};
 
-pub async fn login(app_data: web::Data<AppData>) -> HttpResponse {
-    let google_service = app_data.google_service.lock().unwrap();
+/**
+ * TODO:
+ * - handle error with location
+ * - implement Redis pool to do not restart service if redis down and than up
+ */
+
+pub async fn login(app_data: web::Data<AppData>) -> Result<HttpResponse, AppError> {
+    let auth_url_payload = process_login(app_data).await?;
+    Ok(HttpResponse::Ok().json(auth_url_payload))
+}
+
+async fn process_login(app_data: web::Data<AppData>) -> Result<Map<String, Value>, AppError> {
+    let google_service = app_data.google_service.lock()?;
     // Generate the authorization URL to which we'll redirect the user.
     let (
         authorize_url,
@@ -13,27 +24,14 @@ pub async fn login(app_data: web::Data<AppData>) -> HttpResponse {
         pkce_code_verifier,
         google_redis_state_ttl_ms,
     ) = google_service.get_authorization_url_data();
-
-    // Set pkce_code_verifier to Redis by key as csrf_state
-    let mut redis_connection = match app_data.redis_connection.lock() {
-        Ok(service) => service,
-        Err(err) => {
-            log::error!("LOCK REDIS SERVICE ERROR: {:?}", err);
-            return HttpResponse::InternalServerError().body("Service unavailable")
-        },
-    };
-    if let Err(err) = redis::set_value_with_ttl(
+    let mut redis_connection = app_data.redis_connection.lock()?;
+    redis::set_value_with_ttl(
         &mut redis_connection,
         csrf_state.secret().as_str(),
          &pkce_code_verifier,
           google_redis_state_ttl_ms as usize,
-        ) {
-            log::error!("SET VALUE REDIS SERVICE ERROR: {:?}", err);
-            return HttpResponse::InternalServerError().body("Service unavailable")//Err(actix_web::error::ErrorInternalServerError(e));
-    }
-
-    // Redirect the user to the Google OAuth2 authorization page
-    let mut payload = Map::new();
-    payload.insert("authorize_url".to_string(), Value::String(authorize_url.to_string()));
-    HttpResponse::Ok().json(payload)//.body(authorize_url.to_string())
+        )?;
+    let mut result = Map::new();
+    result.insert("authorize_url".to_string(), Value::String(authorize_url.to_string()));
+    return Ok(result);
 }
