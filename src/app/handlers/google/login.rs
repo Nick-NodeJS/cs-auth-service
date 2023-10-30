@@ -1,6 +1,6 @@
 use cs_shared_lib::redis;
 use serde_json::{Map, Value};
-use crate::app::{app_data::AppData, app_errors::AppError};
+use crate::app::{app_data::AppData, app_error::AppError};
 
 use actix_web::{web, HttpResponse};
 

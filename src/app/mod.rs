@@ -1,7 +1,7 @@
 mod handlers;
 mod services;
 mod app_data;
-mod app_errors;
+mod app_error;
 
 use std::sync::{Arc, Mutex};
 
