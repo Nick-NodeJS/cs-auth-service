@@ -5,12 +5,13 @@ mod app_error;
 
 use std::sync::{Arc, Mutex};
 
-use actix_web::{web, App, HttpServer};
+use actix_web::{web, App, HttpServer, middleware::Logger};
 
 use cs_shared_lib::redis;
 use log::info;
-use env_logger::Env;
+use env_logger::{Env, init_from_env, try_init_from_env};
 use crate::app::app_data::AppData;
+use crate::app::services::redis::service::RedisService;
 use crate::config::{
     app_config::AppConfig,
     google_config::GoogleConfig,
@@ -37,11 +38,12 @@ use crate::app::services::google::service::GoogleService;
 
 pub async fn run() -> std::io::Result<()> {
     // Initialize the logger
-    env_logger::Builder::from_env(Env::default().filter_or("RUST_LOG", "info")).init();
+    // env_logger::init_from_env(Env::default().filter_or("RUST_LOG", "info"));
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     let app_config = AppConfig::new();
     let google_config = GoogleConfig::new();
-    let redis_config = RedisConfig::new();
+    // let redis_config = RedisConfig::new();
 
     info!("Service address {}", app_config.server_address_with_port());
 
@@ -52,17 +54,18 @@ pub async fn run() -> std::io::Result<()> {
     if let Err(err) = google_service.init().await {
         panic!("Error to init Google Service: {}", err.to_string());
     }
-    let redis_connection = match redis::get_connection(&redis_config.get_redis_url()) {
+    let redis_service = match RedisService::new() {
         Ok(service) => service,
         Err(err) => panic!("{:?}", err),
     };
     let app_data = AppData {
         google_service: Arc::new(Mutex::new(google_service)),
-        redis_connection: Arc::new(Mutex::new(redis_connection)),
+        redis_service: Arc::new(Mutex::new(redis_service)),
     };
 
     HttpServer::new(move || {
         App::new()
+            .wrap(Logger::default())
             .app_data(web::Data::new(app_data.clone()))
             .service(
                 web::scope(format!("/api/{}", app_config.api_version).as_ref())

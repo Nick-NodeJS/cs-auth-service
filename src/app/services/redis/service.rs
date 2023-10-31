@@ -1,20 +1,28 @@
-use anyhow::Result;
-use redis::{Connection, ConnectionLike, Client};
-//use redis::AsyncCommands;
-use redis::Commands;
+use std::ops::DerefMut;
+use std::time::Duration;
 
+use anyhow::Result;
+use r2d2::Pool;
+use r2d2::PooledConnection;
+use r2d2_redis::RedisConnectionManager;
+use r2d2_redis::redis;
+
+use crate::app::app_error::AppError;
 use crate::config::redis_config::RedisConfig;
 
 pub struct RedisService {
-    connection: Connection,
+    pool: Pool<RedisConnectionManager>,
 }
 
 impl RedisService {
     pub fn new() -> Result<Self> {
         let redis_config = RedisConfig::new();
-        let client = redis::Client::open(redis_config.get_redis_url())?;
-        let connection = client.get_connection()?;
-        Ok(RedisService { connection })
+        let manager = RedisConnectionManager::new(redis_config.get_redis_url())?;
+        // let pool = Pool::new(manager)?;
+        let pool = Pool::builder()
+            .connection_timeout(Duration::from_secs(5))
+            .build(manager)?;
+        Ok(RedisService { pool })
     }
 
     // For future use
@@ -24,16 +32,20 @@ impl RedisService {
     //     Ok(())
     // }
 
-    pub async fn set_value_with_ttl(&mut self, key: &str, value: &str, milliseconds: usize) -> Result<(), redis::RedisError> {
-        //let mut connection  = self.client.get_connection()?;
-        let _:() = self.connection.set_ex(key, value, milliseconds)?;
-        //redis::cmd("SET").arg(key).arg(value).arg("EX").arg(milliseconds).query(connection)?;
+    pub fn set_value_with_ttl(&mut self, key: &str, value: &str, milliseconds: usize) -> Result<(), AppError> {
+        let mut connection = self.get_connection()?;
+        redis::cmd("SET").arg(key).arg(value).arg("EX").arg(milliseconds).query(connection.deref_mut())?;
         Ok(())
     }
 
-    pub async fn get_value(&mut self, key: &str) -> Result<Option<String>, redis::RedisError> {
-        //let mut connection = self.client.get_connection()?;
-        let value: Option<String> = self.connection.get(key)?;//redis::cmd("GET").arg(key).query(connection)?;
+    pub fn get_value(&mut self, key: &str) -> Result<Option<String>, AppError> {
+        let mut connection = self.get_connection()?;
+        let value: Option<String> = redis::cmd("GET").arg(key).query(connection.deref_mut())?;
         Ok(value)
+    }
+
+    fn get_connection(&self) -> Result<PooledConnection<RedisConnectionManager>, AppError> {
+        let connection = self.pool.get()?;
+        Ok(connection)
     }
 }

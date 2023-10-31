@@ -20,6 +20,7 @@ use oauth2::reqwest::async_http_client;
 use serde::{Serialize, Deserialize};
 use serde_json::{Map, Value};
 
+use crate::app::app_error::AppError;
 use crate::config::google_config::GoogleConfig;
 
 pub struct GoogleService {
@@ -105,7 +106,7 @@ impl GoogleService {
       );
     }
 
-    pub async fn get_tokens(&self, code: String, pkce_code_verifier: String) -> Result<(String, String), String> {
+    pub async fn get_tokens(&self, code: String, pkce_code_verifier: String) -> Result<(String, String), AppError> {
       // Exchange the code with a token.
       match self.oauth2_client
       .exchange_code(AuthorizationCode::new(code))
@@ -117,38 +118,36 @@ impl GoogleService {
           if let Some(refresh_token) = token_response.refresh_token() {
             return Ok((access_token.to_owned(), refresh_token.secret().to_owned()));
           } else {
-            return Err("token response doesn't have refresh token".to_string());
+            return Err(AppError::NoRefreshTokenResponseError);
           }
         },
         Err(err) => {
-          return Err(err.to_string());
+          log::debug!("OAuth2 RequestTokenError: {:?}", err);
+          return Err(AppError::OAuth2RequestTokenError);
         },
       }
     }
 
-    pub fn get_access_token_user_data(&self, access_token: &str) -> Result<TokenData<Claims>, String> {
+    pub fn get_access_token_user_data(&self, access_token: &str) -> Result<TokenData<Claims>, AppError> {
         // Validation configuration
         let validation = Validation::new(Algorithm::RS256);
 
         // Decode the Google access token
         let decoding_key = match &self.google_oauth2_decoding_key {
           Some(d_key) => d_key,
-          None => return Err("No decoding key on Google Service!".to_string()),
+          None => return Err(AppError::NoDecodingKeyError),
         };
 
-        let token_data = match decode(
+        let token_data = decode(
             access_token,
             decoding_key,
             &validation,
-        ) {
-          Ok(t_data) => t_data,
-          Err(err) => return Err(err.to_string()),
-        };
+          )?;
 
         Ok(token_data)
     }
 
-    pub fn parse_query_string(&self, query_string: &str) -> Result<(String, String), &str> {
+    pub fn parse_query_string(&self, query_string: &str) -> Result<(String, String), AppError> {
       let try_params = web::Query::<HashMap<String, String>>::from_query(
         query_string,
       );
@@ -158,19 +157,19 @@ impl GoogleService {
           if let Some(code_string) = params.get("code") {
             code = code_string.to_owned();
           } else {
-            return Err("Invalid code parameter")
+            return Err(AppError::CodeParamError)
           };
           let state: String;
           if let Some(state_string) = params.get("state") {
             state = state_string.to_owned();
           } else {
-            return Err("Invalid code parameter")
+            return Err(AppError::CodeParamError)
           };
           return Ok((code, state));
         },
         Err(err) => {
           log::error!("{}", err.to_string());
-          return Err("Invalid query string")
+          return Err(AppError::QueryStringError)
         },
       }
     }
@@ -185,13 +184,10 @@ impl GoogleService {
       &self,
       tokens: &(String, String),
       //  redis_connection: MutexGuard<'_, RedisConnection>,
-    ) -> Result<(), String> {
+    ) -> Result<(), AppError> {
       println!("tokens {:?}", tokens);
       let (access_token, refresh_token) = tokens;
-      let user_data = match self.get_access_token_user_data(access_token) {
-          Ok(data) => data,
-          Err(err) => return Err(err.to_string()), 
-      };
+      let user_data = self.get_access_token_user_data(access_token)?;
       println!("User data {:?}", user_data);
       /* TODO:
        - update google service to get OAuth2 cert on initial step(method new)
