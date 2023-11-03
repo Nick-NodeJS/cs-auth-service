@@ -79,7 +79,7 @@ where
   P: oauth2::ErrorResponse,
 {
   fn from(err: RequestTokenError<T, P>) -> Self {
-    log::debug!("OAuth2 request token error");
+    log::debug!("OAuth2 request token error: {:?}", err);
     return AppError::OAuth2RequestTokenError
   }
 }

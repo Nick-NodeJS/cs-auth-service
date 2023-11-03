@@ -92,10 +92,11 @@ impl GoogleService {
       let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
       let (authorize_url, csrf_state) = self.oauth2_client
         .authorize_url(CsrfToken::new_random)
-        // This example is requesting access to the user's profile.
+        // This is requesting access to the user's profile.
         .add_scope(Scope::new(
             "https://www.googleapis.com/auth/plus.me".to_string(),
         ))
+        .add_extra_param("access_type", "offline")
         .set_pkce_challenge(pkce_code_challenge)
         .url();
       return (
@@ -106,6 +107,11 @@ impl GoogleService {
       );
     }
 
+    /// It makes http request to GAPI and gets access token and refresh token.
+    /// If user was registered during the test flow, you have to go to
+    /// https://myaccount.google.com/connections?hl=en
+    /// and delete all connection with this app to be able to receive refresh token,
+    /// in another way it always returns access token only and you will have NoRefreshTokenResponseError (tested 03.11.2023)
     pub async fn get_tokens(&self, code: String, pkce_code_verifier: String) -> Result<(String, String), AppError> {
       // Exchange the code with a token.
       match self.oauth2_client
@@ -114,7 +120,6 @@ impl GoogleService {
       .request_async(async_http_client).await {
         Ok(token_response) => {
           let access_token = token_response.access_token().secret();
-          println!("Access token: {:?}", access_token);
           if let Some(refresh_token) = token_response.refresh_token() {
             return Ok((access_token.to_owned(), refresh_token.secret().to_owned()));
           } else {
@@ -122,7 +127,7 @@ impl GoogleService {
           }
         },
         Err(err) => {
-          log::debug!("OAuth2 RequestTokenError: {:?}", err);
+          log::debug!("OAuth2 RequestTokenError: {}", err.to_string());
           return Err(AppError::OAuth2RequestTokenError);
         },
       }
@@ -147,6 +152,7 @@ impl GoogleService {
         Ok(token_data)
     }
 
+    /// get code and state params from query string
     pub fn parse_query_string(&self, query_string: &str) -> Result<(String, String), AppError> {
       let try_params = web::Query::<HashMap<String, String>>::from_query(
         query_string,
