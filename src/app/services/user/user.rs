@@ -1,20 +1,20 @@
 use crate::app::app_error::AppError;
 
 pub struct GoogleProfile {
-  user_id: String,
-  name: Option<String>,
-  email: Option<String>,
+  pub user_id: String,
+  pub name: Option<String>,
+  pub email: Option<String>,
 }
 
 pub struct FacebookProfile {
-  user_id: String,
-  name: Option<String>,
-  email: Option<String>,
+  pub user_id: String,
+  pub name: Option<String>,
+  pub email: Option<String>,
 }
 
 pub enum UserProfile {
-  GoogleProfile,
-  FacebookProfile,
+  Google(GoogleProfile),
+  Facebook(FacebookProfile),
 }
 
 pub enum UserActiveProfile {
@@ -25,8 +25,8 @@ pub enum UserActiveProfile {
 pub struct User {
   id: String,
   active_profile: UserActiveProfile,
-  google: Option<UserProfile>,
-  facebook: Option<UserProfile>,
+  google: Option<GoogleProfile>,
+  facebook: Option<FacebookProfile>,
 }
 
 impl User {
@@ -37,9 +37,9 @@ impl User {
       google: None,
       facebook: None,
     };
-    match active_profile {
-        UserActiveProfile::Google => user.google = Some(profile),
-        UserActiveProfile::Facebook => user.facebook = Some(profile),
+    match profile {
+        UserProfile::Google(google_profile) => user.google = Some(google_profile),
+        UserProfile::Facebook(facebook_profile) => user.facebook = Some(facebook_profile),
     }
     Ok(user)
   }

@@ -10,6 +10,7 @@ use r2d2_redis::redis;
 use crate::app::app_error::AppError;
 use crate::config::redis_config::RedisConfig;
 
+#[derive(Debug, Clone)]
 pub struct RedisService {
     pool: Pool<RedisConnectionManager>,
 }

@@ -1,6 +1,6 @@
 use actix_web::{HttpRequest, HttpResponse, web};
 
-use crate::app::{app_data::AppData, app_error::AppError};
+use crate::app::{app_data::AppData, app_error::AppError, services::user::user::GoogleProfile};
 
 pub async fn auth_callback(req: HttpRequest, app_data: web::Data<AppData>) -> Result<HttpResponse, AppError> {
   let mut redis_service = app_data.redis_service.lock()?;
@@ -18,6 +18,8 @@ pub async fn auth_callback(req: HttpRequest, app_data: web::Data<AppData>) -> Re
   // TODO: google_service.get_user().await,
   // user_service.set_google_user().await, including data storage and cache updating
   let tokens = google_service.get_tokens(code, pkce_code_verifier).await?;
+  let token_data = google_service.get_user_profile(tokens.clone()).await?;
+  // let google_profile = GoogleProfile(token_data);
   let tokens_as_json = google_service.tokens_as_json(tokens);
   Ok(HttpResponse::Ok().json(tokens_as_json))
 }

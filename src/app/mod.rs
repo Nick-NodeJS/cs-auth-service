@@ -12,6 +12,7 @@ use log::info;
 use env_logger::{Env, init_from_env, try_init_from_env};
 use crate::app::app_data::AppData;
 use crate::app::services::redis::service::RedisService;
+use crate::app::services::user::service::UserService;
 use crate::config::{
     app_config::AppConfig,
     google_config::GoogleConfig,
@@ -42,25 +43,15 @@ pub async fn run() -> std::io::Result<()> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     let app_config = AppConfig::new();
-    let google_config = GoogleConfig::new();
     // let redis_config = RedisConfig::new();
 
     info!("Service address {}", app_config.server_address_with_port());
 
     let server_address_with_port = app_config.server_address_with_port();
 
-    // Set AppData to share services, configs etc
-    let mut google_service = GoogleService::new(google_config);
-    if let Err(err) = google_service.init().await {
-        panic!("Error to init Google Service: {}", err.to_string());
-    }
-    let redis_service = match RedisService::new() {
-        Ok(service) => service,
-        Err(err) => panic!("{:?}", err),
-    };
-    let app_data = AppData {
-        google_service: Arc::new(Mutex::new(google_service)),
-        redis_service: Arc::new(Mutex::new(redis_service)),
+    let app_data = match AppData::new().await {
+        Ok(data) => data,
+        Err(err) => panic!("Error to create AppData: {:?}", err),
     };
 
     HttpServer::new(move || {

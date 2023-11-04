@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use std::sync::MutexGuard;
 
@@ -21,6 +22,7 @@ use serde::{Serialize, Deserialize};
 use serde_json::{Map, Value};
 
 use crate::app::app_error::AppError;
+use crate::app::services::user::user::GoogleProfile;
 use crate::config::google_config::GoogleConfig;
 
 pub struct GoogleService {
@@ -133,7 +135,7 @@ impl GoogleService {
       }
     }
 
-    pub fn get_access_token_user_data(&self, access_token: &str) -> Result<TokenData<Claims>, AppError> {
+    pub async fn get_user_profile(&self, tokens: (String, String)) -> Result<GoogleProfile, AppError> {
         // Validation configuration
         let validation = Validation::new(Algorithm::RS256);
 
@@ -143,13 +145,17 @@ impl GoogleService {
           None => return Err(AppError::NoDecodingKeyError),
         };
 
-        let token_data = decode(
-            access_token,
-            decoding_key,
-            &validation,
-          )?;
+        // let token_data: TokenData<GoogleProfile> = decode<GoogleProfile>(
+        //     &tokens.0.to_string(),
+        //     decoding_key,
+        //     &validation,
+        //   )?;
 
-        Ok(token_data)
+        Ok(GoogleProfile {
+          user_id: String::from(""),
+          name: Some(String::from("")),
+          email: Some(String::from("")),
+        })
     }
 
     /// get code and state params from query string
@@ -193,8 +199,8 @@ impl GoogleService {
     ) -> Result<(), AppError> {
       println!("tokens {:?}", tokens);
       let (access_token, refresh_token) = tokens;
-      let user_data = self.get_access_token_user_data(access_token)?;
-      println!("User data {:?}", user_data);
+      // let user_data = self.get_access_token_user_data(access_token)?;
+      // println!("User data {:?}", user_data);
       /* TODO:
        - update google service to get OAuth2 cert on initial step(method new)
        - decode access_token -> token data(google service)
