@@ -20,10 +20,7 @@ impl AppData {
     // Set AppData to share services, configs etc
     let google_config = GoogleConfig::new();
     
-    let mut google_service = GoogleService::new(google_config);
-    if let Err(err) = google_service.init().await {
-        panic!("Error to init Google Service: {}", err.to_string());
-    }
+    let google_service = GoogleService::new(google_config).await?;
     let redis_service = match RedisService::new() {
         Ok(service) => service,
         Err(err) => panic!("{:?}", err),

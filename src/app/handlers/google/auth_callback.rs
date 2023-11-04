@@ -15,10 +15,10 @@ pub async fn auth_callback(req: HttpRequest, app_data: web::Data<AppData>) -> Re
     log::debug!("No callback request state {} in Redis", state);
     return Err(AppError::CallbackStateCacheError);
   }
-  // TODO: google_service.get_user().await,
+  // TODO: update google_service.get_user_data() to get GoogleProfile and tokens,
   // user_service.set_google_user().await, including data storage and cache updating
   let tokens = google_service.get_tokens(code, pkce_code_verifier).await?;
-  let token_data = google_service.get_user_profile(tokens.clone()).await?;
+  let token_data = google_service.get_user_data(tokens.clone()).await?;
   // let google_profile = GoogleProfile(token_data);
   let tokens_as_json = google_service.tokens_as_json(tokens);
   Ok(HttpResponse::Ok().json(tokens_as_json))

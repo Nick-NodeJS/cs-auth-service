@@ -25,10 +25,12 @@ use crate::app::app_error::AppError;
 use crate::app::services::user::user::GoogleProfile;
 use crate::config::google_config::GoogleConfig;
 
+use super::error::GoogleServiceError;
+
 pub struct GoogleService {
     oauth2_client: BasicClient,
     config: GoogleConfig,
-    google_oauth2_decoding_key: Option<DecodingKey>,
+    google_oauth2_decoding_key: DecodingKey,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,7 +44,7 @@ pub struct Claims {
 }
 
 impl GoogleService {
-    pub fn new(config: GoogleConfig) -> Self {
+    pub async fn new(config: GoogleConfig) -> Result<Self, GoogleServiceError> {
       let google_client_id = ClientId::new(config.google_client_id.to_string());
       let google_client_secret = ClientSecret::new(config.google_client_secret.to_string());
       let oauth_url = AuthUrl::new(config.google_oauth_url.to_string())
@@ -66,26 +68,20 @@ impl GoogleService {
           RevocationUrl::new(config.google_revoke_url.to_string())
               .expect("Invalid revocation endpoint URL"),
       );
-      let google_oauth2_decoding_key: Option<DecodingKey> = None;
+      let google_oauth2_decoding_key: DecodingKey = get_google_oauth2_sert(&config.google_cert_url).await?;
 
-      GoogleService {
+      Ok(GoogleService {
         oauth2_client: client,
         config,
         google_oauth2_decoding_key,
-      }
+      })
     }
 
-    pub async fn init(&mut self) -> Result<(), String> {
-      return Ok(());
-      /*match get_google_oauth2_sert(&self.config.google_cert_url).await {
-        Ok(google_oauth2_decoding_key) => {
-          self.google_oauth2_decoding_key = Some(google_oauth2_decoding_key);
-          return Ok(())
-        },
-        Err(err) => {
-          return Err(format!("Error to get Google OAuth2 sertificate: {}", err));
-        }
-      }*/
+    pub async fn get_decoding_key(cert_url: &str) -> Result<DecodingKey, String> {
+      match get_google_oauth2_sert(cert_url).await {
+        Ok(google_oauth2_decoding_key) => Ok(google_oauth2_decoding_key),
+        Err(err) => Err(format!("Error to get Google OAuth2 sertificate: {}", err))
+      }
     }
 
     pub fn get_authorization_url_data(&self) -> (Url, CsrfToken, String, u32) {
@@ -135,15 +131,12 @@ impl GoogleService {
       }
     }
 
-    pub async fn get_user_profile(&self, tokens: (String, String)) -> Result<GoogleProfile, AppError> {
+    pub async fn get_user_data(&self, tokens: (String, String)) -> Result<GoogleProfile, GoogleServiceError> {
         // Validation configuration
         let validation = Validation::new(Algorithm::RS256);
 
         // Decode the Google access token
-        let decoding_key = match &self.google_oauth2_decoding_key {
-          Some(d_key) => d_key,
-          None => return Err(AppError::NoDecodingKeyError),
-        };
+        let decoding_key = &self.google_oauth2_decoding_key;
 
         // let token_data: TokenData<GoogleProfile> = decode<GoogleProfile>(
         //     &tokens.0.to_string(),
@@ -254,26 +247,17 @@ impl GoogleService {
     }
 }
 
-async fn get_google_oauth2_sert(url: &str) -> Result<DecodingKey, String> {
+async fn get_google_oauth2_sert(url: &str) -> Result<DecodingKey, GoogleServiceError> {
   // let headers = HeaderMap::new();
   // let response = request::get(url, headers).await?.json::<serde_json::Value>()?;
   let client = Client::new();
-  let mut jwks_response = match client.get(url).send().await {
-    Ok(jwks_response_try) => jwks_response_try,
-    Err(err) => return Err(err.to_string()),
-  };
-  let jwks = match jwks_response.json::<serde_json::Value>().await {
-    Ok(jwk_try) => jwk_try,
-    Err(err) => return Err(err.to_string()),
-  };
+  let mut jwks_response = client.get(url).send().await?;
+  let jwks = jwks_response.json::<serde_json::Value>().await?;
   let key = jwks["keys"][0].clone();
   println!("key {:?}, url: {}", key, url);
   // Create a decoding key from the selected key
-  return match DecodingKey::from_rsa_components(
+  Ok(DecodingKey::from_rsa_components(
     &key["n"].as_str().unwrap(),
     &key["e"].as_str().unwrap(),
-  ) {
-    Ok(decoding_key) => Ok(decoding_key),
-    Err(err) => Err(err.to_string()),
-  };
+  )?)
 }

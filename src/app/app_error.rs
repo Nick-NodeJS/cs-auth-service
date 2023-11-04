@@ -7,7 +7,9 @@ use r2d2::Error as PoolError;
 use thiserror::Error;
 use log::error;
 use actix_web::http;
-use jsonwebtoken::errors::Error as JWTError;
+
+use super::services::google::error::GoogleServiceError;
+// use jsonwebtoken::errors::Error as JWTError;
 
 #[derive(Debug, Error, ResponseError)]
 pub enum AppError {
@@ -47,9 +49,13 @@ pub enum AppError {
   #[error("No decoding key on Google Service")]
   NoDecodingKeyError,
 
+  // #[response(reason = "Internal service error")]
+  // #[error("JWT decoding error")]
+  // JWTDecodingError,
+
   #[response(reason = "Internal service error")]
-  #[error("JWT decoding error")]
-  JWTDecodingError,
+  #[error("GoogleService error")]
+  GoogleServiceError,
 }
 
 impl<T> From<PoisonError<T>> for AppError {
@@ -84,9 +90,16 @@ where
   }
 }
 
-impl From<JWTError> for AppError {
-  fn from(err: JWTError) -> Self {
-    log::debug!("JWT decoding error: {:?}", err);
-    return AppError::JWTDecodingError
+// impl From<JWTError> for AppError {
+//   fn from(err: JWTError) -> Self {
+//     log::debug!("JWT decoding error: {:?}", err);
+//     return AppError::JWTDecodingError
+//   }
+// }
+
+impl From<GoogleServiceError> for AppError {
+  fn from(err: GoogleServiceError) -> Self {
+    log::debug!("GoogleServiceError: {:?}", err);
+    return AppError::GoogleServiceError
   }
 }

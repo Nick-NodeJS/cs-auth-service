@@ -18,7 +18,7 @@ pub async fn login(app_data: web::Data<AppData>) -> Result<HttpResponse, AppErro
         google_redis_state_ttl_ms,
     ) = google_service.get_authorization_url_data();
 
-    // get redis connection and set auth data
+    // get redis service and set auth data in cache
     let mut redis_service = app_data.redis_service.lock()?;
     redis_service
         .set_value_with_ttl(
