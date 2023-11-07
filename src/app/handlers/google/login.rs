@@ -19,8 +19,8 @@ pub async fn login(app_data: web::Data<AppData>) -> Result<HttpResponse, AppErro
     ) = google_service.get_authorization_url_data();
 
     // get redis service and set auth data in cache
-    let mut redis_service = app_data.redis_service.lock()?;
-    redis_service
+    let mut cache_service = app_data.cache_service.lock()?;
+    cache_service
         .set_value_with_ttl(
         csrf_state.secret().as_str(),
          &pkce_code_verifier,

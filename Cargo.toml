@@ -17,12 +17,10 @@ jsonwebtoken = "8.3.0"
 log = "0.4"
 oauth2 = "4.4.1"
 regex = "1.9.5"
-serde = { version = "1.0", feature = ["derive"]}
+serde = { version = "1.0", features = ["derive"]}
 url = "2.4.1"
-redis = "0.23.3"
+redis = { version = "0.23.3", features = ["cluster"] }
 serde_json = "1.0.107"
 thiserror = "1.0.50"
 actix-web-thiserror = "0.2.0"
 actix-web-thiserror-derive = "0.2.0"
-r2d2_redis = "0.14.0"
-r2d2 = "0.8.10"

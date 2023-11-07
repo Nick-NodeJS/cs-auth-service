@@ -11,7 +11,10 @@ pub enum GoogleServiceError {
   SendRequestError,
 
   #[error("Json payload error")]
-  JsonPayloadError
+  JsonPayloadError,
+
+  #[error("Error")]
+  Error,
 }
 
 impl From<JWTError> for GoogleServiceError {
@@ -32,6 +35,13 @@ impl From<JsonPayloadError> for GoogleServiceError {
   fn from(err: JsonPayloadError) -> Self {
     log::debug!("JsonPayloadError: {:?}", err);
     return GoogleServiceError::JsonPayloadError
+  }
+}
+
+impl From<String> for GoogleServiceError {
+  fn from(err: String) -> Self {
+    log::debug!("Error: {}", err);
+    return GoogleServiceError::Error
   }
 }
 

@@ -3,7 +3,7 @@ use crate::config::google_config::GoogleConfig;
 
 use super::{services::{
   google::service::GoogleService,
-  redis::service::RedisService,
+  cache::service::CacheService,
   user::service::UserService
 }, app_error::AppError};
 
@@ -11,7 +11,7 @@ use super::{services::{
 #[derive(Clone)]
 pub struct AppData {
   pub google_service: Arc<Mutex<GoogleService>>,
-  pub redis_service: Arc<Mutex<RedisService>>,
+  pub cache_service: Arc<Mutex<CacheService>>,
   pub user_service: Arc<Mutex<UserService>>,
 }
 
@@ -21,14 +21,14 @@ impl AppData {
     let google_config = GoogleConfig::new();
     
     let google_service = GoogleService::new(google_config).await?;
-    let redis_service = match RedisService::new() {
+    let cache_service = match CacheService::new() {
         Ok(service) => service,
         Err(err) => panic!("{:?}", err),
     };
-    let user_service = UserService::new(redis_service.clone())?;
+    let user_service = UserService::new(cache_service.clone())?;
     let app_data = AppData {
         google_service: Arc::new(Mutex::new(google_service)),
-        redis_service: Arc::new(Mutex::new(redis_service)),
+        cache_service: Arc::new(Mutex::new(cache_service)),
         user_service: Arc::new(Mutex::new(user_service)),
     };
     Ok(app_data)

@@ -1,9 +1,12 @@
-use crate::app::app_error::AppError;
+use serde::{Serialize, Deserialize};
 
+use super::error::UserServiceError;
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GoogleProfile {
   pub user_id: String,
   pub name: Option<String>,
-  pub email: Option<String>,
+  pub email: String,
 }
 
 pub struct FacebookProfile {
@@ -30,7 +33,7 @@ pub struct User {
 }
 
 impl User {
-  pub fn new(id: String, active_profile: UserActiveProfile, profile: UserProfile ) -> Result<User, AppError> {
+  pub fn new(id: String, active_profile: UserActiveProfile, profile: UserProfile ) -> Result<User, UserServiceError> {
     let mut user = User {
       id,
       active_profile,

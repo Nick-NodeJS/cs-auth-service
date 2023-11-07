@@ -2,13 +2,12 @@ use std::sync::PoisonError;
 
 use actix_web_thiserror_derive::ResponseError;
 use oauth2::RequestTokenError;
-use r2d2_redis::redis::RedisError;
-use r2d2::Error as PoolError;
+use redis::RedisError;
 use thiserror::Error;
 use log::error;
 use actix_web::http;
 
-use super::services::google::error::GoogleServiceError;
+use super::services::{google::error::GoogleServiceError, user::error::UserServiceError};
 // use jsonwebtoken::errors::Error as JWTError;
 
 #[derive(Debug, Error, ResponseError)]
@@ -21,9 +20,9 @@ pub enum AppError {
   #[error("Redis error")]
   RedisError,
 
-  #[response(reason = "Internal service error")]
-  #[error("Pool error")]
-  PoolError,
+  // #[response(reason = "Internal service error")]
+  // #[error("Pool error")]
+  // PoolError,
 
   #[response(reason = "Bad Request")]
   #[error("Invalid query string")]
@@ -56,6 +55,10 @@ pub enum AppError {
   #[response(reason = "Internal service error")]
   #[error("GoogleService error")]
   GoogleServiceError,
+
+  #[response(reason = "Internal service error")]
+  #[error("UserService error")]
+  UserServiceError,
 }
 
 impl<T> From<PoisonError<T>> for AppError {
@@ -72,10 +75,10 @@ impl From<RedisError> for AppError {
   }
 }
 
-impl From<PoolError> for AppError {
-  fn from(err: PoolError) -> Self {
-    log::debug!("Pool error: {:?}", err);
-    return AppError::PoolError
+impl From<UserServiceError> for AppError {
+  fn from(err: UserServiceError) -> Self {
+    log::debug!("UserServiceError: {:?}", err);
+    return AppError::UserServiceError
   }
 }
 
@@ -89,13 +92,6 @@ where
     return AppError::OAuth2RequestTokenError
   }
 }
-
-// impl From<JWTError> for AppError {
-//   fn from(err: JWTError) -> Self {
-//     log::debug!("JWT decoding error: {:?}", err);
-//     return AppError::JWTDecodingError
-//   }
-// }
 
 impl From<GoogleServiceError> for AppError {
   fn from(err: GoogleServiceError) -> Self {

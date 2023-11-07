@@ -11,7 +11,7 @@ use cs_shared_lib::redis;
 use log::info;
 use env_logger::{Env, init_from_env, try_init_from_env};
 use crate::app::app_data::AppData;
-use crate::app::services::redis::service::RedisService;
+use crate::app::services::cache::service::CacheService;
 use crate::app::services::user::service::UserService;
 use crate::config::{
     app_config::AppConfig,
