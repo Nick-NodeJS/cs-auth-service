@@ -1,6 +1,6 @@
 use actix_web::{web, HttpRequest, HttpResponse};
 
-use crate::app::{app_data::AppData, app_error::AppError};
+use crate::app::{app_data::AppData, app_error::AppError, services::common::tokens_as_json};
 
 pub async fn auth_callback(
     req: HttpRequest,
@@ -12,9 +12,9 @@ pub async fn auth_callback(
     // process code and state to get tokens
     // TODO: update google_service.get_user_data() to get GoogleProfile and tokens,
     // user_service.set_google_user().await, including data storage and cache updating
-    let tokens = google_service.get_tokens(code, state).await?;
-    // let token_data = google_service.get_user_profile(tokens.clone()).await?;
-    // println!("Google User: {:?}", token_data);
-    let tokens_as_json = google_service.tokens_as_json(tokens);
+    let (access_token, id_token, refresh_token) = google_service.get_tokens(code, state).await?;
+    let token_data = google_service.get_user_profile(&id_token).await?;
+    println!("Google User: {:?}", token_data);
+    let tokens_as_json = tokens_as_json((access_token, refresh_token));
     Ok(HttpResponse::Ok().json(tokens_as_json))
 }

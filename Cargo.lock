@@ -556,6 +556,7 @@ dependencies = [
  "actix-web-thiserror-derive",
  "anyhow",
  "awc",
+ "base64 0.21.5",
  "cs_shared_lib",
  "dotenv",
  "env_logger",

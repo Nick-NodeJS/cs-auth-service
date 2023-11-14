@@ -1,20 +1,23 @@
 use std::any::Any;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::MutexGuard;
 
 use actix_web::error::PayloadError;
-use actix_web::http::Method;
-use actix_web::web;
-use awc::error::SendRequestError;
+use actix_web::http::{Method, StatusCode};
+use actix_web::web::{self, Bytes, Form};
+use awc::error::{HeaderValue, SendRequestError};
 use awc::Client;
+use base64::Engine;
 use cs_shared_lib::redis as Redis;
 use jsonwebtoken as jwt;
-use jwt::{decode, Algorithm, DecodingKey, TokenData, Validation};
+use jwt::{decode, Algorithm, DecodingKey, Header, TokenData, Validation};
+use oauth2::http::status::InvalidStatusCode;
 use oauth2::http::{request, HeaderMap};
 use redis::Connection as RedisConnection;
 
 use oauth2::basic::BasicClient;
-use oauth2::reqwest::{async_http_client, http_client};
+use oauth2::reqwest::async_http_client;
 use oauth2::url::Url;
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, HttpRequest, PkceCodeChallenge,
@@ -38,15 +41,35 @@ use super::error::GoogleServiceError;
    "expires_in": "3555",
    "access_type": "offline"
 */
+
+/// Takes the result of a rsplit and ensure we only get 2 parts
+/// Errors if we don't
+macro_rules! expect_two {
+    ($iter:expr) => {{
+        let mut i = $iter;
+        match (i.next(), i.next(), i.next()) {
+            (Some(first), Some(second), None) => (first, second),
+            _ => return Err(GoogleServiceError::JWTDecodingError),
+        }
+    }};
+}
+
 #[derive(Debug, serde::Deserialize, Serialize)]
-struct TokenClaims {
+pub struct TokenClaims {
+    iss: String,
     azp: String,
-    aud: String,
+    pub aud: String,
     sub: String,
-    scope: String,
-    exp: String,
-    expires_in: String,
-    access_type: String,
+    email: String,
+    email_verified: bool,
+    at_hash: String,
+    name: String,
+    picture: String,
+    given_name: String,
+    family_name: String,
+    locale: String,
+    iat: u32,
+    exp: u32,
 }
 pub struct GoogleService {
     oauth2_client: BasicClient,
@@ -149,106 +172,70 @@ impl GoogleService {
         &mut self,
         code: String,
         state: String,
-    ) -> Result<(String, String), GoogleServiceError> {
+    ) -> Result<(String, String, String), GoogleServiceError> {
         // get pkce_code_verifier
         let pkce_code_verifier = self.get_pkce_code_verifier(&state)?;
         // Exchange the code with a token.
-        match self
-            .oauth2_client
-            .exchange_code(AuthorizationCode::new(code))
-            .set_pkce_verifier(PkceCodeVerifier::new(pkce_code_verifier))
-            .request_async(async_http_client)
-            .await
-        {
-            Ok(token_response) => {
-                let access_token = token_response.access_token().secret();
-                if let Some(refresh_token) = token_response.refresh_token() {
-                    return Ok((access_token.to_owned(), refresh_token.secret().to_owned()));
-                } else {
-                    return Err(GoogleServiceError::NoRefreshTokenResponseError);
-                }
-            }
-            Err(err) => {
-                log::debug!("OAuth2 RequestTokenError: {}", err.to_string());
-                return Err(GoogleServiceError::OAuth2RequestTokenError);
-            }
-        }
 
-        // println!(
-        //     "\ncode: {},\npkce_code_verifier: {}\n",
-        //     code, pkce_code_verifier
-        // );
-        // Ok((
-        //     "fake_access_token".to_string(),
-        //     "fake_refresh_token".to_string(),
-        // ))
-    }
-
-    /**
-     * tokens:
-     * "ya29.a0AfB_byByPqYWjgxasfvxtuPFKvnuu6uS9Y7Tw5UIWC6kCMpt25BPTmYeqcQxI9IK_iMaOV-TfebaEfWpAQL1AL83P-SWcjYp-dMr082FwNYD4wuYv8jLVH77OKFJ-5VL2h-iK978TMjY56qDZYUVuZCivLVFg_jYuPS5aCgYKATkSARESFQGOcNnCXRzrsSi4TibZ0lyGTuxHyg0171", "1//09Ob98-h15LlVCgYIARAAGAkSNwF-L9IrKv3v6yBTLeDxasPdfzBJX308BIX8KRXjwldKFl6ABQBMHKuj6MjXP9NnH3Qrq79JfSs"
-     *
-     * key:
-     * Object {
-     * "alg": String("RS256"),
-     * "e": String("AQAB"),
-     * "kid": String("f5f4bf46e52b31d9b6249f7309ad0338400680cd"),
-     * "kty": String("RSA"),
-     * "n": String("q5hcowR4IuPiSvHbwj9Rv9j2XRnrgbAAFYBqoLBwUV5GVIiNPKnQBYa8ZEIK2naj9gqpo3DU9lx7d7RzeVlzCS5eUA2LV94--KbT0YgIJnApj5-hyDIaevI1Sf2YQr_cntgVLvxqfW1n9ZvbQSitz5Tgh0cplZvuiWMFPu4_mh6B3ShEKIl-qi-h0cZJlRcIf0ZwkfcDOTE8bqEzWUvlCpCH9FK6Mo9YLjw5LroBcHdUbOg3Keu0uW5SCEi-2XBQgCF6xF3kliciwwnv2HhCPyTiX0paM_sT2uKspYock-IQglQ2TExoJqbYZe6CInSHiAA68fkSkJQDnuRZE7XTJQ"),
-     * "use": String("sig")
-     * }
-     */
-
-    pub async fn get_user_profile(
-        &self,
-        tokens: (String, String),
-    ) -> Result<GoogleProfile, GoogleServiceError> {
-        // Validation configuration
-        // let validation = Validation::new(Algorithm::RS256);
-
-        //         // Decode the Google access token
-        //         let decoding_key = get_google_oauth2_sert("https://www.googleapis.com/oauth2/v3/certs").await?;//&self.google_oauth2_decoding_key;
-        println!("Tokens: {:?}\n", tokens);
-        //         let token_data: TokenData<TokenClaims> = match decode(
-        //             &tokens.0.to_string(),
-        //             &decoding_key,
-        //             &validation,
-        //           ) {
-        //             Ok(data) => data,
-        //             Err(err) => {
-        //               log::error!("Decode Error: {}\n tokens: {:?}\n", err, tokens);
-        //               return Err(GoogleServiceError::JWTDecodingError)
-        //             }
-        //           };
-        //           println!("Token data: {:?}", token_data);
+        // oauth2::BasicClient doesn't have in StandartTokenResponse "id_token"
+        // that's why we use common async_http_client
 
         let mut headers = HeaderMap::new();
         headers.insert(
-            "Authorization",
-            format!("Bearer {}", tokens.0).parse().expect(""),
+            "Content-Type",
+            HeaderValue::from_static("application/x-www-form-urlencoded"),
         );
+        let url = Url::from_str(&self.config.google_token_url)?;
+        log::debug!(
+            "\ncode: {},\npkce_code_verifier: {}\n",
+            code,
+            pkce_code_verifier
+        );
+        let params: Vec<(&str, &str)> = vec![
+            ("code", &code),
+            ("client_id", &self.config.google_client_id),
+            ("client_secret", &self.config.google_client_secret),
+            ("redirect_uri", &self.config.google_redirect_url),
+            ("grant_type", "authorization_code"),
+            ("code_verifier", &pkce_code_verifier),
+        ];
         let response = async_http_client(HttpRequest {
-            method: Method::GET,
-            url: Url::parse("https://www.googleapis.com/oauth2/v3/userinfo")
-                .expect("parse url error"),
+            method: Method::POST,
+            url,
             headers,
-            body: vec![],
+            body: url::form_urlencoded::Serializer::new(String::new())
+                .extend_pairs(params)
+                .finish()
+                .into_bytes(),
         })
         .await
-        .map_err(|err| format!("Userinfo request error: {err}"))?;
-        let user_info: Value;
-        if response.status_code.is_success() {
-            user_info = serde_json::from_slice(&response.body)
-                .expect("userinfo response body deserialize error");
-        } else {
-            log::error!("Error to get userinfo: {:?}", response);
-            return Err(GoogleServiceError::SendRequestError);
+        .map_err(|err| format!("Get token request error: {err}"))?;
+
+        if !response.status_code.is_success() {
+            log::error!(
+                "Tokens request error, response body: {:?}",
+                String::from_utf8_lossy(&response.body)
+            );
+            return Err(GoogleServiceError::OAuth2RequestTokenError);
         }
+        let result: Value = serde_json::from_slice(&response.body)?;
+        log::debug!("\nGoogle token response: {:?}\n", result);
+        // TODO: reimplement json body parsing more efficient to get strings without extra symbols(")
+        Ok((
+            result["access_token"].to_string(),
+            result["id_token"].to_string().trim_matches('"').to_string(),
+            result["refresh_token"].to_string(),
+        ))
+    }
+
+    pub async fn get_user_profile(&self, token: &str) -> Result<GoogleProfile, GoogleServiceError> {
+        let token_data = decode_token(token, &self.google_oauth2_decoding_key, true)?;
+        println!("Token data: {:?}", token_data);
 
         Ok(GoogleProfile {
-            user_id: user_info["sub"].as_str().unwrap().to_string(),
-            name: Some(user_info["name"].as_str().unwrap().to_string()),
-            email: user_info["email"].as_str().unwrap().to_string(),
+            user_id: token_data.sub,
+            name: Some(token_data.name),
+            email: token_data.email,
         })
     }
 
@@ -280,57 +267,28 @@ impl GoogleService {
             }
         }
     }
+}
 
-    /// #### Actions:
-    /// 1 - decode user data by tokens (GAPI request)
-    ///
-    /// 2 - create a new or update user in data storage
-    ///
-    /// 3 - reflect user in cache
-    pub async fn set_user_to_storage(
-        &self,
-        tokens: &(String, String),
-        //  redis_connection: MutexGuard<'_, RedisConnection>,
-    ) -> Result<(), GoogleServiceError> {
-        println!("tokens {:?}", tokens);
-        let (access_token, refresh_token) = tokens;
-        // let user_data = self.get_access_token_user_data(access_token)?;
-        // println!("User data {:?}", user_data);
-        /* TODO:
-        - update google service to get OAuth2 cert on initial step(method new)
-        - decode access_token -> token data(google service)
-        - create database service
-        - create new user or update existing user in database
-        - set or update cache with token data
-        */
-        return Ok(());
+pub fn decode_token(
+    token: &str,
+    key: &DecodingKey,
+    check_expiration: bool,
+) -> Result<TokenClaims, GoogleServiceError> {
+    // Validation configuration
+    let mut validation = Validation::new(Algorithm::RS256);
+    if !check_expiration {
+        validation.validate_exp = false;
     }
 
-    /// return tokens as json object
-    /// #### Arguments
-    ///
-    /// * `tokens` - A Tuple of strings
-    ///
-    /// ```
-    /// (String, String)
-    /// ```
-    ///
-    /// where tokens\[0\] is access_token and tokens\[1\] is refresh_token
-    ///
-    /// #### Response example:
-    /// ```
-    ///  {
-    ///   "access_token": "$access_token",
-    ///   "refresh_token": "$refresh_token"
-    ///   }
-    /// ```
-    pub fn tokens_as_json(&self, tokens: (String, String)) -> Map<String, Value> {
-        let (access_token, refresh_token) = tokens;
-        let mut payload = Map::new();
-        payload.insert("access_token".to_string(), Value::String(access_token));
-        payload.insert("refresh_token".to_string(), Value::String(refresh_token));
-        return payload;
-    }
+    let token_data: TokenData<TokenClaims> = match decode(token, key, &validation) {
+        Ok(data) => data,
+        Err(err) => {
+            log::error!("Decode Error: {}\n token: {}\n", err, token);
+            return Err(GoogleServiceError::JWTDecodingError);
+        }
+    };
+
+    Ok(token_data.claims)
 }
 
 async fn get_google_oauth2_sert(cert_url: &str) -> Result<DecodingKey, GoogleServiceError> {

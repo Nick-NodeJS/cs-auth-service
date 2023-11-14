@@ -1,6 +1,6 @@
 use cs_shared_lib::validation::validate_integer_in_range;
-use serde::Deserialize;
 use dotenv::dotenv;
+use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
 pub struct GoogleConfig {
@@ -13,6 +13,7 @@ pub struct GoogleConfig {
     pub google_plus_me_url: String,
     pub google_cert_url: String,
     pub google_redis_state_ttl_ms: u32,
+    pub google_test_token: String,
 }
 
 impl GoogleConfig {
@@ -40,12 +41,14 @@ impl GoogleConfig {
             .expect("GOOGLE_STATE_REDIS_TTL_MS environment variable is not set")
             .parse()
             .expect("Invalid GOOGLE_STATE_REDIS_TTL_MS");
+        let google_test_token = dotenv::var("GOOGLE_TEST_TOKEN")
+            .expect("Missing the GOOGLE_CERT_URL environment variable.");
 
         // Validate TTL in milliseconds to keep Google OAuth2 state in Redis
         // make sense to keep it not more than 3 min
-        if !validate_integer_in_range(google_redis_state_ttl_ms, 1, 3 * 60 * 1000*1000) {
+        if !validate_integer_in_range(google_redis_state_ttl_ms, 1, 3 * 60 * 1000 * 1000) {
             panic!("GOOGLE_STATE_REDIS_TTL_MS out of the range");
-              }
+        }
 
         Self {
             google_client_id,
@@ -57,6 +60,7 @@ impl GoogleConfig {
             google_plus_me_url,
             google_cert_url,
             google_redis_state_ttl_ms,
+            google_test_token,
         }
     }
 }

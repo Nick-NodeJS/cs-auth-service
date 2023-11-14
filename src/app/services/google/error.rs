@@ -1,3 +1,5 @@
+use std::string::FromUtf8Error;
+
 use awc::error::{JsonPayloadError, SendRequestError};
 use jsonwebtoken::errors::Error as JWTError;
 use oauth2::RequestTokenError;
@@ -35,6 +37,15 @@ pub enum GoogleServiceError {
 
     #[error("Invalid code paramater")]
     CodeParamError,
+
+    #[error("Error to parse Url string")]
+    UrlParseError,
+
+    #[error("Serde json error")]
+    SerdeJsonError,
+
+    #[error("FromUtf8Error")]
+    FromUtf8Error,
 }
 
 impl From<RedisError> for GoogleServiceError {
@@ -80,5 +91,26 @@ where
     fn from(err: RequestTokenError<T, P>) -> Self {
         log::debug!("OAuth2 request token error: {:?}", err);
         return GoogleServiceError::OAuth2RequestTokenError;
+    }
+}
+
+impl From<oauth2::url::ParseError> for GoogleServiceError {
+    fn from(err: oauth2::url::ParseError) -> Self {
+        log::debug!("oauth2::url::ParseError: {}", err);
+        return GoogleServiceError::UrlParseError;
+    }
+}
+
+impl From<serde_json::Error> for GoogleServiceError {
+    fn from(err: serde_json::Error) -> Self {
+        log::debug!("serde_json::Error: {}", err);
+        return GoogleServiceError::SerdeJsonError;
+    }
+}
+
+impl From<FromUtf8Error> for GoogleServiceError {
+    fn from(err: FromUtf8Error) -> Self {
+        log::debug!("FromUtf8Error: {}", err);
+        return GoogleServiceError::FromUtf8Error;
     }
 }
