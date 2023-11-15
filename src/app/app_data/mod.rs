@@ -28,6 +28,7 @@ impl AppData {
         let google_service = GoogleService::new(google_config, cache_service.clone()).await?;
 
         let user_service = UserService::new(cache_service)?;
+
         let app_data = AppData {
             google_service: Arc::new(Mutex::new(google_service)),
             user_service: Arc::new(Mutex::new(user_service)),

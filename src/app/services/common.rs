@@ -25,3 +25,20 @@ pub fn tokens_as_json(tokens: (String, String)) -> Map<String, Value> {
     payload.insert("refresh_token".to_string(), Value::String(refresh_token));
     return payload;
 }
+
+/// return error string as json object
+/// #### Arguments
+///
+/// * `error` - ```String```
+///
+/// #### Response example:
+/// ```
+///  {
+///   "error": "Some error information"
+///   }
+/// ```
+pub fn error_as_json(error: String) -> Map<String, Value> {
+    let mut payload = Map::new();
+    payload.insert("error".to_string(), Value::String(error));
+    return payload;
+}

@@ -42,19 +42,14 @@ use super::error::GoogleServiceError;
    "access_type": "offline"
 */
 
-/// Takes the result of a rsplit and ensure we only get 2 parts
-/// Errors if we don't
-macro_rules! expect_two {
-    ($iter:expr) => {{
-        let mut i = $iter;
-        match (i.next(), i.next(), i.next()) {
-            (Some(first), Some(second), None) => (first, second),
-            _ => return Err(GoogleServiceError::JWTDecodingError),
-        }
-    }};
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GoogleTokens {
+    pub access_token: String,
+    pub id_token: String,
+    pub refresh_token: Option<String>,
 }
 
-#[derive(Debug, serde::Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TokenClaims {
     iss: String,
     azp: String,
@@ -167,12 +162,12 @@ impl GoogleService {
     /// If user was registered during the test flow, you have to go to
     /// https://myaccount.google.com/connections?hl=en
     /// and delete all connection with this app to be able to receive refresh token,
-    /// in another way it always returns access token only and you will have NoRefreshTokenResponseError (tested 03.11.2023)
+    /// in another way it always returns access token only (tested 03.11.2023)
     pub async fn get_tokens(
         &mut self,
         code: String,
         state: String,
-    ) -> Result<(String, String, String), GoogleServiceError> {
+    ) -> Result<GoogleTokens, GoogleServiceError> {
         // get pkce_code_verifier
         let pkce_code_verifier = self.get_pkce_code_verifier(&state)?;
         // Exchange the code with a token.
@@ -218,14 +213,10 @@ impl GoogleService {
             );
             return Err(GoogleServiceError::OAuth2RequestTokenError);
         }
-        let result: Value = serde_json::from_slice(&response.body)?;
+        let result = serde_json::from_slice::<GoogleTokens>(&response.body)?;
         log::debug!("\nGoogle token response: {:?}\n", result);
         // TODO: reimplement json body parsing more efficient to get strings without extra symbols(")
-        Ok((
-            result["access_token"].to_string(),
-            result["id_token"].to_string().trim_matches('"').to_string(),
-            result["refresh_token"].to_string(),
-        ))
+        Ok(result)
     }
 
     pub async fn get_user_profile(&self, token: &str) -> Result<GoogleProfile, GoogleServiceError> {
@@ -266,6 +257,11 @@ impl GoogleService {
                 return Err(GoogleServiceError::QueryStringError);
             }
         }
+    }
+
+    pub async fn revoke_token(&self, token: String) -> Result<(), GoogleServiceError> {
+        // TODO: implement Google API token revokation
+        Ok(())
     }
 }
 
