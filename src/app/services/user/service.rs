@@ -13,6 +13,11 @@ impl UserService {
     pub fn new(cache_service: CacheService) -> Result<Self, UserServiceError> {
         Ok(UserService { cache_service })
     }
+
+    // TODO:
+    // - create a new or update existing user
+    // - add refresh token to session collection
+    // - update cache with user session
     pub async fn set_user(&self, user_profile: UserProfile) -> Result<(), UserServiceError> {
         /// TODO: generate real id
         let id = "fsdafsdf".to_string();
@@ -46,6 +51,6 @@ impl UserService {
         &self,
         google_user_id: String,
     ) -> Result<Option<String>, UserServiceError> {
-        Ok(Some("".to_string()))
+        Ok(Some("fake_refresh_token".to_string()))
     }
 }

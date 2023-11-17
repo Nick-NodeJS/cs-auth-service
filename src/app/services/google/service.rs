@@ -1,76 +1,34 @@
-use std::any::Any;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::MutexGuard;
 
-use actix_web::error::PayloadError;
-use actix_web::http::{Method, StatusCode};
-use actix_web::web::{self, Bytes, Form};
-use awc::error::{HeaderValue, SendRequestError};
-use awc::Client;
+use actix_web::http::Method;
+use actix_web::web;
+use awc::error::HeaderValue;
 use base64::Engine;
-use cs_shared_lib::redis as Redis;
 use jsonwebtoken as jwt;
-use jwt::{decode, Algorithm, DecodingKey, Header, TokenData, Validation};
-use oauth2::http::status::InvalidStatusCode;
-use oauth2::http::{request, HeaderMap};
-use redis::Connection as RedisConnection;
+use jwt::{decode, Algorithm, DecodingKey, TokenData, Validation};
+use oauth2::http::HeaderMap;
 
 use oauth2::basic::BasicClient;
 use oauth2::reqwest::async_http_client;
 use oauth2::url::Url;
 use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, HttpRequest, PkceCodeChallenge,
-    PkceCodeVerifier, RedirectUrl, RevocationUrl, Scope, TokenResponse, TokenUrl,
+    AuthUrl, ClientId, ClientSecret, CsrfToken, HttpRequest, PkceCodeChallenge, RedirectUrl,
+    RevocationUrl, Scope, TokenUrl,
 };
-use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
 
 use crate::app::services::cache::service::CacheService;
 use crate::app::services::user::user::GoogleProfile;
 use crate::config::google_config::GoogleConfig;
 
 use super::error::GoogleServiceError;
+use super::structures::{GoogleKeys, GoogleTokens, TokenClaims, TokenHeaderObject};
 
-/**
-* "azp": "208797228814-b81ki7a2fnjepfaph64isme6i26oomgv.apps.googleusercontent.com",
-   "aud": "208797228814-b81ki7a2fnjepfaph64isme6i26oomgv.apps.googleusercontent.com",
-   "sub": "109265904531099102897",
-   "scope": "openid",
-   "exp": "1699298566",
-   "expires_in": "3555",
-   "access_type": "offline"
-*/
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct GoogleTokens {
-    pub access_token: String,
-    pub id_token: String,
-    pub refresh_token: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TokenClaims {
-    iss: String,
-    azp: String,
-    pub aud: String,
-    sub: String,
-    email: String,
-    email_verified: bool,
-    at_hash: String,
-    name: String,
-    picture: String,
-    given_name: String,
-    family_name: String,
-    locale: String,
-    iat: u32,
-    exp: u32,
-}
 pub struct GoogleService {
     oauth2_client: BasicClient,
     cache_service: CacheService,
     config: GoogleConfig,
-    google_oauth2_decoding_key: DecodingKey,
+    google_oauth2_decoding_keys: HashMap<String, DecodingKey>,
 }
 
 impl GoogleService {
@@ -100,14 +58,13 @@ impl GoogleService {
             RevocationUrl::new(config.google_revoke_url.to_string())
                 .expect("Invalid revocation endpoint URL"),
         );
-        let google_oauth2_decoding_key: DecodingKey =
-            get_google_oauth2_sert(&config.google_cert_url).await?;
+        let google_oauth2_decoding_keys = get_google_oauth2_keys(&config.google_cert_url).await?;
 
         Ok(GoogleService {
             oauth2_client: client,
             cache_service,
             config,
-            google_oauth2_decoding_key,
+            google_oauth2_decoding_keys,
         })
     }
 
@@ -219,8 +176,29 @@ impl GoogleService {
         Ok(result)
     }
 
+    pub fn get_token_key(&self, token: &str) -> Result<&DecodingKey, GoogleServiceError> {
+        let token_string = token.to_string();
+        let token_parts: Vec<&str> = token_string.split('.').collect();
+        let try_header = token_parts.into_iter().next();
+        match try_header {
+            Some(header) => {
+                let decoded_slice =
+                    base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(header)?;
+                let header_object = serde_json::from_slice::<TokenHeaderObject>(&decoded_slice)?;
+                let try_key = self.google_oauth2_decoding_keys.get(&header_object.kid);
+                if let Some(key) = try_key {
+                    return Ok(key);
+                } else {
+                    return Err(GoogleServiceError::BadTokenStructure);
+                }
+            }
+            None => Err(GoogleServiceError::BadTokenStructure),
+        }
+    }
+
     pub async fn get_user_profile(&self, token: &str) -> Result<GoogleProfile, GoogleServiceError> {
-        let token_data = decode_token(token, &self.google_oauth2_decoding_key, true)?;
+        let key = self.get_token_key(token)?;
+        let token_data = decode_token(token, key, true)?;
         println!("Token data: {:?}", token_data);
 
         Ok(GoogleProfile {
@@ -287,7 +265,9 @@ pub fn decode_token(
     Ok(token_data.claims)
 }
 
-async fn get_google_oauth2_sert(cert_url: &str) -> Result<DecodingKey, GoogleServiceError> {
+async fn get_google_oauth2_keys(
+    cert_url: &str,
+) -> Result<HashMap<String, DecodingKey>, GoogleServiceError> {
     let jwks_response = async_http_client(HttpRequest {
         method: Method::GET,
         url: Url::parse(cert_url).expect("parse url error"),
@@ -296,14 +276,22 @@ async fn get_google_oauth2_sert(cert_url: &str) -> Result<DecodingKey, GoogleSer
     })
     .await
     .expect("request Error");
-    let jwks: Value =
-        serde_json::from_str(&String::from_utf8(jwks_response.body).expect("error to string"))
-            .expect("deserialize error");
-    let key = jwks["keys"][0].clone();
-    log::debug!("key {:?}, cert_url: {}", key, cert_url);
-    // Create a decoding key from the selected key
-    Ok(DecodingKey::from_rsa_components(
-        &key["n"].as_str().unwrap(),
-        &key["e"].as_str().unwrap(),
-    )?)
+
+    let jwt_keys = serde_json::from_slice::<GoogleKeys>(&jwks_response.body)?;
+    let mut keys = HashMap::new();
+    jwt_keys.keys.into_iter().for_each(|cert| {
+        let key = DecodingKey::from_rsa_components(&cert.n, &cert.e);
+        match key {
+            Ok(k) => {
+                keys.insert(cert.kid, k);
+                return ();
+            }
+            Err(err) => log::error!(
+                "Error to create Decoding key for cert: {:?}, error: {}",
+                cert,
+                err
+            ),
+        };
+    });
+    Ok(keys)
 }

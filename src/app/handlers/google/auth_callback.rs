@@ -13,7 +13,6 @@ pub async fn auth_callback(
     req: HttpRequest,
     app_data: web::Data<AppData>,
 ) -> Result<HttpResponse, AppError> {
-    // let mut cache_service = app_data.cache_service.lock()?;
     let mut google_service = app_data.google_service.lock()?;
     let mut user_service = app_data.user_service.lock()?;
     let (code, state) = google_service.parse_auth_query_string(req.query_string())?;

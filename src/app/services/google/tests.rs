@@ -7,6 +7,12 @@ mod tests {
     };
 
     #[test]
+    /*
+        TODO:
+       It must to make GAPI request to ket fresh key. Response has couple of options.
+       The right option is the one which 'kid' is inside of token header
+       Do not forget update Google Service to decode token properly
+    */
     fn test_google_token_decoding() {
         let google_config = GoogleConfig::new();
         let token: &str = &google_config.google_test_token;

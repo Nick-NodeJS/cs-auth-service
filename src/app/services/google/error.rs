@@ -46,6 +46,12 @@ pub enum GoogleServiceError {
 
     #[error("FromUtf8Error")]
     FromUtf8Error,
+
+    #[error("Wrong token, unable to get header")]
+    BadTokenStructure,
+
+    #[error("Base64 decode error")]
+    Base64DecodeError,
 }
 
 impl From<RedisError> for GoogleServiceError {
@@ -112,5 +118,12 @@ impl From<FromUtf8Error> for GoogleServiceError {
     fn from(err: FromUtf8Error) -> Self {
         log::debug!("FromUtf8Error: {}", err);
         return GoogleServiceError::FromUtf8Error;
+    }
+}
+
+impl From<base64::DecodeError> for GoogleServiceError {
+    fn from(err: base64::DecodeError) -> Self {
+        log::debug!("base64::DecodeError: {}", err);
+        return GoogleServiceError::Base64DecodeError;
     }
 }
