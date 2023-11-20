@@ -4,7 +4,8 @@ use std::sync::{Arc, Mutex};
 use super::{
     app_error::AppError,
     services::{
-        cache::service::CacheService, google::service::GoogleService, user::service::UserService,
+        cache::service::CacheService, google::service::GoogleService,
+        storage::service::get_storage_service, user::service::UserService,
     },
 };
 
@@ -17,6 +18,9 @@ pub struct AppData {
 impl AppData {
     pub async fn new() -> Result<AppData, AppError> {
         // Set AppData to share services, configs etc
+
+        // let storage_service = get_storage_service();
+        // storage_service.set_user(user);
 
         let cache_service = match CacheService::new() {
             Ok(service) => service,
