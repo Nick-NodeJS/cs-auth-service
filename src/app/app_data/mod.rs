@@ -5,7 +5,7 @@ use super::{
     app_error::AppError,
     services::{
         cache::service::CacheService, google::service::GoogleService,
-        storage::service::get_storage_service, user::service::UserService,
+        storage::service::StorageService, user::service::UserService,
     },
 };
 
@@ -19,19 +19,18 @@ impl AppData {
     pub async fn new() -> Result<AppData, AppError> {
         // Set AppData to share services, configs etc
 
-        // let storage_service = get_storage_service();
-        // storage_service.set_user(user);
-
         let cache_service = match CacheService::new() {
             Ok(service) => service,
             Err(err) => panic!("{:?}", err),
         };
 
+        let storage_service = StorageService::new().await?;
+
         let google_config = GoogleConfig::new();
 
         let google_service = GoogleService::new(google_config, cache_service.clone()).await?;
 
-        let user_service = UserService::new(cache_service)?;
+        let user_service = UserService::new(cache_service, storage_service)?;
 
         let app_data = AppData {
             google_service: Arc::new(Mutex::new(google_service)),

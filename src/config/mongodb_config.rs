@@ -69,14 +69,14 @@ impl MongoDBConfig {
     // Combine server address and port as a single string
     pub fn get_connection_uri(&self) -> String {
         format!(
-            "{}://{}:{}@{}:{}/{}?{}",
+            "{}://{}:{}@{}:{}",
             self.connection_uri_prefix,
             self.user_name,
             self.password,
             self.host,
             self.port,
-            self.database,
-            self.connection_options,
+            // self.database,
+            // self.connection_options,
         )
     }
 }

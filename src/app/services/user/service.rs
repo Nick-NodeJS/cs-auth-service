@@ -1,4 +1,4 @@
-use crate::app::services::cache::service::CacheService;
+use crate::app::services::{cache::service::CacheService, storage::service::StorageService};
 
 use super::{
     error::UserServiceError,
@@ -7,11 +7,18 @@ use super::{
 
 pub struct UserService {
     cache_service: CacheService,
+    storage_service: StorageService,
 }
 
 impl UserService {
-    pub fn new(cache_service: CacheService) -> Result<Self, UserServiceError> {
-        Ok(UserService { cache_service })
+    pub fn new(
+        cache_service: CacheService,
+        storage_service: StorageService,
+    ) -> Result<Self, UserServiceError> {
+        Ok(UserService {
+            cache_service,
+            storage_service,
+        })
     }
 
     // TODO:
