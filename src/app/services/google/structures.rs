@@ -1,10 +1,4 @@
-use std::collections::HashMap;
-
-use jsonwebtoken::DecodingKey;
-use oauth2::basic::BasicClient;
 use serde::{Deserialize, Serialize};
-
-use crate::{app::services::cache::service::CacheService, config::google_config::GoogleConfig};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TokenHeaderObject {

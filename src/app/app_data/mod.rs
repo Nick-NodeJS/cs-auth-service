@@ -26,9 +26,7 @@ impl AppData {
 
         let storage_service = StorageService::new().await?;
 
-        let google_config = GoogleConfig::new();
-
-        let google_service = GoogleService::new(google_config, cache_service.clone()).await?;
+        let google_service = GoogleService::new(cache_service.clone()).await?;
 
         let user_service = UserService::new(cache_service, storage_service)?;
 

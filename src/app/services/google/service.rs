@@ -17,8 +17,8 @@ use oauth2::{
     RevocationUrl, Scope, TokenUrl,
 };
 
+use crate::app::models::user::GoogleProfile;
 use crate::app::services::cache::service::CacheService;
-use crate::app::services::user::user::GoogleProfile;
 use crate::config::google_config::GoogleConfig;
 
 use super::error::GoogleServiceError;
@@ -32,10 +32,8 @@ pub struct GoogleService {
 }
 
 impl GoogleService {
-    pub async fn new(
-        config: GoogleConfig,
-        cache_service: CacheService,
-    ) -> Result<Self, GoogleServiceError> {
+    pub async fn new(cache_service: CacheService) -> Result<Self, GoogleServiceError> {
+        let config = GoogleConfig::new();
         let google_client_id = ClientId::new(config.google_client_id.to_string());
         let google_client_secret = ClientSecret::new(config.google_client_secret.to_string());
         let oauth_url = AuthUrl::new(config.google_oauth_url.to_string())
@@ -199,7 +197,7 @@ impl GoogleService {
     pub async fn get_user_profile(&self, token: &str) -> Result<GoogleProfile, GoogleServiceError> {
         let key = self.get_token_key(token)?;
         let token_data = decode_token(token, key, true)?;
-        println!("Token data: {:?}", token_data);
+        log::debug!("\nToken data: {:?}\n", token_data);
 
         Ok(GoogleProfile {
             user_id: token_data.sub,

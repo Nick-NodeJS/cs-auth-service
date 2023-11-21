@@ -21,7 +21,7 @@ impl MongoDBConfig {
         let host =
             dotenv::var("MONGODB_HOST").expect("MONGODB_HOST environment variable is not set");
 
-        // Validate and parse the redis port
+        // Validate and parse the mongodb port
         let port = dotenv::var("MONGODB_PORT")
             .expect("MONGODB_PORT environment variable is not set")
             .parse()
@@ -31,7 +31,7 @@ impl MongoDBConfig {
             panic!("MONGODB port out of the range");
         }
 
-        // Validate redis address using the ip-address crate
+        // Validate mongodb address using the ip-address crate
         if !is_valid_ipv4(&host) {
             panic!("Invalid MONGODB_HOST");
         }
@@ -66,17 +66,17 @@ impl MongoDBConfig {
         }
     }
 
-    // Combine server address and port as a single string
+    // Combine config params to get connection uri
     pub fn get_connection_uri(&self) -> String {
         format!(
-            "{}://{}:{}@{}:{}",
+            "{}://{}:{}@{}:{}/{}?{}",
             self.connection_uri_prefix,
             self.user_name,
             self.password,
             self.host,
             self.port,
-            // self.database,
-            // self.connection_options,
+            self.database,
+            self.connection_options,
         )
     }
 }

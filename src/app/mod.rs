@@ -1,33 +1,30 @@
-mod handlers;
-mod services;
 mod app_data;
 mod app_error;
+mod handlers;
+mod models;
+mod services;
 
 use std::sync::{Arc, Mutex};
 
-use actix_web::{web, App, HttpServer, middleware::Logger};
+use actix_web::{middleware::Logger, web, App, HttpServer};
 
-use cs_shared_lib::redis;
-use log::info;
-use env_logger::{Env, init_from_env, try_init_from_env};
 use crate::app::app_data::AppData;
 use crate::app::services::cache::service::CacheService;
 use crate::app::services::user::service::UserService;
 use crate::config::{
-    app_config::AppConfig,
-    google_config::GoogleConfig,
-    redis_config::RedisConfig,
+    app_config::AppConfig, google_config::GoogleConfig, redis_config::RedisConfig,
 };
+use cs_shared_lib::redis;
+use env_logger::{init_from_env, try_init_from_env, Env};
+use log::info;
 
 use crate::app::handlers::google::{
-    auth_callback::auth_callback as google_auth_callback,
-    login::login as login_with_google,
+    auth_callback::auth_callback as google_auth_callback, login::login as login_with_google,
 };
 
 use crate::app::handlers::health_check::status;
 
 use crate::app::services::google::service::GoogleService;
-
 
 /**
  * TODO:
@@ -60,17 +57,16 @@ pub async fn run() -> std::io::Result<()> {
             .app_data(web::Data::new(app_data.clone()))
             .service(
                 web::scope(format!("/api/{}", app_config.api_version).as_ref())
-                .service(
-                    web::scope("/auth")
-                    .route("/google", web::get().to(login_with_google))
-                    .route("/google/callback", web::get().to(google_auth_callback))
-                )
-                .route("/status", web::get().to(status))
-                // .service(
-                //     web::scope("/users")
-                //     .wrap(authentication_middleware)
-                //     .route("/me", web::get().to(user_profile))
-                // )
+                    .service(
+                        web::scope("/auth")
+                            .route("/google", web::get().to(login_with_google))
+                            .route("/google/callback", web::get().to(google_auth_callback)),
+                    )
+                    .route("/status", web::get().to(status)), // .service(
+                                                              //     web::scope("/users")
+                                                              //     .wrap(authentication_middleware)
+                                                              //     .route("/me", web::get().to(user_profile))
+                                                              // )
             )
     })
     .bind(server_address_with_port)?

@@ -3,10 +3,8 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use crate::app::{
     app_data::AppData,
     app_error::AppError,
-    services::{
-        common::{error_as_json, tokens_as_json},
-        user::user::UserProfile,
-    },
+    models::user::UserProfile,
+    services::common::{error_as_json, tokens_as_json},
 };
 
 pub async fn auth_callback(
@@ -33,7 +31,7 @@ pub async fn auth_callback(
         return Ok(HttpResponse::Ok().json(tokens_as_json((tokens.access_token, refresh_token))));
     } else {
         log::warn!(
-            "User id: {} google token response has no refresh token",
+            "\nUser id: {} google token response has no refresh token\n",
             user_profile.user_id
         );
         if let Some(google_refresh_token) = user_service
@@ -47,7 +45,7 @@ pub async fn auth_callback(
                 .json(tokens_as_json((tokens.access_token, google_refresh_token))));
         } else {
             log::warn!(
-                "Google user id: {} has no refresh token. Should relogin",
+                "\nGoogle user id: {} has no refresh token. Should relogin\n",
                 user_profile.user_id
             );
             google_service
