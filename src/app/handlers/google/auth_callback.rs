@@ -26,7 +26,7 @@ pub async fn auth_callback(
     // it has to pass tokens to User Service
     if let Some(refresh_token) = tokens.refresh_token {
         user_service
-            .set_user(UserProfile::Google(user_profile))
+            .create_or_update_user_with_profile(UserProfile::Google(user_profile))
             .await?;
         return Ok(HttpResponse::Ok().json(tokens_as_json((tokens.access_token, refresh_token))));
     } else {
@@ -35,11 +35,11 @@ pub async fn auth_callback(
             user_profile.user_id
         );
         if let Some(google_refresh_token) = user_service
-            .check_if_google_user_logged_in(user_profile.user_id.clone())
+            .check_if_user_logged_in(user_profile.user_id.clone())
             .await?
         {
             user_service
-                .set_user(UserProfile::Google(user_profile))
+                .create_or_update_user_with_profile(UserProfile::Google(user_profile))
                 .await?;
             return Ok(HttpResponse::Ok()
                 .json(tokens_as_json((tokens.access_token, google_refresh_token))));

@@ -1,10 +1,9 @@
-use chrono::Utc;
-use mongodb::bson::oid::ObjectId;
-use mongodb::bson::{self, doc, to_bson, to_document, Bson, DateTime};
-use mongodb::options::{ClientOptions, CreateCollectionOptions};
+use bson::Document;
+use mongodb::bson::{self, doc};
+use mongodb::options::ClientOptions;
 use mongodb::{Client, Collection, Database};
 
-use crate::app::models::user::{GoogleProfile, User, UserActiveProfile};
+use crate::app::models::user::User;
 use crate::config::mongodb_config::MongoDBConfig;
 
 use super::error::StorageServiceError;
@@ -28,14 +27,10 @@ impl StorageService {
         log::info!("\nMongoDB database {} is connected.\n", &config.database);
         Ok(StorageService { config, database })
     }
-    pub async fn get_user_by_google_id(
-        &self,
-        google_id: &str,
-    ) -> Result<Option<User>, StorageServiceError> {
+
+    pub async fn get_user(&self, query: Document) -> Result<Option<User>, StorageServiceError> {
         // TODO: implement caching on this level
-        let query = doc! {
-            "google.user_id": Bson::String(google_id.to_string()),
-        };
+
         let mut raw_user = self.get_users_collection().find(query, None).await?;
         if raw_user.advance().await? {
             let user = bson::from_slice(raw_user.current().as_bytes())?;
@@ -45,29 +40,20 @@ impl StorageService {
         }
     }
 
-    pub async fn update_user_by_id_with_google_profile(
+    pub async fn update_user(
         &self,
-        user_id: ObjectId,
-        google_profile: GoogleProfile,
+        filter: Document,
+        data_to_update: Document,
     ) -> Result<(), StorageServiceError> {
         // TODO: implement caching on this level
-        let query = doc! {
-            "_id": Bson::ObjectId(user_id),
-        };
-        let user_data = doc! {
-            "google.name": google_profile.name,
-            "google.email": google_profile.email,
-            "google.email_verified": google_profile.email_verified,
-            "google.picture": google_profile.picture,
-            "updated_at": Utc::now(),
-        };
         self.get_users_collection()
-            .find_one_and_update(query, doc! { "$set": user_data }, None)
+            .find_one_and_update(filter, doc! { "$set": data_to_update }, None)
             .await?;
         Ok(())
     }
 
     pub async fn insert_user(&self, user: User) -> Result<(), StorageServiceError> {
+        // TODO: check if it returns _id which is the same as user._id
         self.get_users_collection().insert_one(user, None).await?;
         Ok(())
     }

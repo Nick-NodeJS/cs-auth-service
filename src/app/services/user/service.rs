@@ -1,5 +1,5 @@
 use crate::app::{
-    models::user::{FacebookProfile, GoogleProfile, User, UserActiveProfile, UserProfile},
+    models::user::{User, UserProfile},
     services::{cache::service::CacheService, storage::service::StorageService},
 };
 
@@ -25,62 +25,35 @@ impl UserService {
     // - create a new or update existing user
     // - insert/update user refresh token in session collection
     // - update cache with user session
-    pub async fn set_user(&self, user_profile: UserProfile) -> Result<(), UserServiceError> {
-        // TODO: generate real id
-        /*
-            - set user
-            - set user session
-        */
-        let user = match user_profile {
-            UserProfile::Google(google_profile) => {
-                let user = self.insert_or_update_google_user(google_profile).await?;
-                Ok(())
-            }
-            UserProfile::Facebook(facebook_profile) => Ok(()),
-            _ => Err(UserServiceError::WrongProfileError),
-        };
-        Ok(())
-    }
-    pub async fn check_if_google_user_logged_in(
+    pub async fn check_if_user_logged_in(
         &self,
-        google_user_id: String,
+        user_id: String,
     ) -> Result<Option<String>, UserServiceError> {
         Ok(Some("fake_refresh_token".to_string()))
     }
 
-    async fn insert_or_update_google_user(
+    pub async fn create_or_update_user_with_profile(
         &self,
-        google_profile: GoogleProfile,
+        user_profile: UserProfile,
     ) -> Result<User, UserServiceError> {
-        if let Some(user) = self
-            .storage_service
-            .get_user_by_google_id(&google_profile.user_id)
-            .await?
-        {
+        if let Some(user) = self.get_user_by_profile(user_profile.clone()).await? {
+            let query = User::get_update_user_profile_query(user_profile);
             self.storage_service
-                .update_user_by_id_with_google_profile(user.id, google_profile)
+                .update_user(User::get_find_user_by_id_query(user.id), query)
                 .await?;
             Ok(user)
         } else {
-            let new_user = User::new(
-                UserActiveProfile::Google,
-                UserProfile::Google(google_profile),
-            );
+            let new_user = User::new(user_profile);
             self.storage_service.insert_user(new_user.clone()).await?;
             Ok(new_user)
         }
-        /*
-            - get user by google id
-            - if exists, update user
-            - else insert a new user
-            - return fresh user
-        */
     }
 
-    async fn insert_or_update_facebook_user(
+    pub async fn get_user_by_profile(
         &self,
-        facebook_profile: FacebookProfile,
-    ) -> Result<(), UserServiceError> {
-        Ok(())
+        user_profile: UserProfile,
+    ) -> Result<Option<User>, UserServiceError> {
+        let query = User::get_find_user_by_profile_query(user_profile);
+        Ok(self.storage_service.get_user(query).await?)
     }
 }
