@@ -238,7 +238,7 @@ impl GoogleService {
     }
 
     pub async fn revoke_token(&self, token: String) -> Result<(), GoogleServiceError> {
-        // TODO: implement Google API token revokation
+        // TODO: implement Google API token revoketion
         Ok(())
     }
 }

@@ -22,9 +22,7 @@ impl UserService {
     }
 
     // TODO:
-    // - create a new or update existing user
-    // - insert/update user refresh token in session collection
-    // - update cache with user session
+    // - check it in sessions
     pub async fn check_if_user_logged_in(
         &self,
         user_id: String,

@@ -17,8 +17,6 @@ impl SessionService {
     }
 
     pub async fn get_session(&self, user_id: &str) -> Result<Option<Session>, SessionServiceError> {
-        // TODO: implement caching on this level
-
         Ok(None)
     }
 

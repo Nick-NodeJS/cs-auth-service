@@ -12,18 +12,16 @@ pub async fn auth_callback(
     app_data: web::Data<AppData>,
 ) -> Result<HttpResponse, AppError> {
     let mut google_service = app_data.google_service.lock()?;
-    let mut user_service = app_data.user_service.lock()?;
+    let user_service = app_data.user_service.lock()?;
     let (code, state) = google_service.parse_auth_query_string(req.query_string())?;
 
     // process code and state to get tokens
-    // TODO: user_service.set_google_user().await, including data storage and cache updating
     let tokens = google_service.get_tokens(code, state).await?;
     let user_profile = google_service.get_user_profile(&tokens.id_token).await?;
 
     // in case Google API returns no refresh token, it has to check if user was logged in before
     // if No(google refresh token is not in system) - it revoke the token and user has to relogin to Google
-    // TODO: during addint a new or updating an existen user it should set session data(refresh token, login timestamp etc)
-    // it has to pass tokens to User Service
+    // TODO: during adding a new or updating an existen user it should set session data(refresh token, login timestamp etc)
     if let Some(refresh_token) = tokens.refresh_token {
         user_service
             .create_or_update_user_with_profile(UserProfile::Google(user_profile))
