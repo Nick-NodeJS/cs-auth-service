@@ -4,18 +4,11 @@ mod handlers;
 mod models;
 mod services;
 
-use std::sync::{Arc, Mutex};
-
 use actix_web::{middleware::Logger, web, App, HttpServer};
 
 use crate::app::app_data::AppData;
-use crate::app::services::cache::service::CacheService;
-use crate::app::services::user::service::UserService;
-use crate::config::{
-    app_config::AppConfig, google_config::GoogleConfig, redis_config::RedisConfig,
-};
-use cs_shared_lib::redis;
-use env_logger::{init_from_env, try_init_from_env, Env};
+use crate::config::app_config::AppConfig;
+use env_logger::Env;
 use log::info;
 
 use crate::app::handlers::google::{
@@ -24,23 +17,17 @@ use crate::app::handlers::google::{
 
 use crate::app::handlers::health_check::status;
 
-use crate::app::services::google::service::GoogleService;
-
 /**
  * TODO:
- * 1. finish redirect flow
- * 2. implement auth flow with multi providers
- * 3. tests
- * 4. docs
+ * 1. add tests
+ * 2. add docs
  */
 
 pub async fn run() -> std::io::Result<()> {
     // Initialize the logger
-    // env_logger::init_from_env(Env::default().filter_or("RUST_LOG", "info"));
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     let app_config = AppConfig::new();
-    // let redis_config = RedisConfig::new();
 
     info!("Service address {}", app_config.server_address_with_port());
 

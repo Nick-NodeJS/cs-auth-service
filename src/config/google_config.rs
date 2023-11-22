@@ -46,7 +46,7 @@ impl GoogleConfig {
 
         // Validate TTL in milliseconds to keep Google OAuth2 state in Redis
         // make sense to keep it not more than 3 min
-        if !validate_integer_in_range(google_redis_state_ttl_ms, 1, 3 * 60 * 1000 * 1000) {
+        if !validate_integer_in_range(google_redis_state_ttl_ms, 1, 3 * 60 * 1000) {
             panic!("GOOGLE_STATE_REDIS_TTL_MS out of the range");
         }
 

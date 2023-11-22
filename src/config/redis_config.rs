@@ -1,4 +1,3 @@
-// src/config.rs
 use cs_shared_lib::validation::{is_valid_ipv4, validate_integer_in_range, validate_ip_port};
 use dotenv::dotenv;
 use serde::Deserialize;
@@ -48,7 +47,7 @@ impl RedisConfig {
         }
     }
 
-    // Combine server address and port as a single string
+    // Combine server address and port to Redis connection URL
     pub fn get_redis_url(&self) -> String {
         format!("redis://{}:{}/{}", self.host, self.port, self.database,)
     }

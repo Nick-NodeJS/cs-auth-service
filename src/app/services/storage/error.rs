@@ -6,8 +6,11 @@ pub enum StorageServiceError {
     #[error("MongoDB error")]
     MongoDBError,
 
-    #[error("MongoDB error")]
+    #[error("MongoDBBsonError error")]
     MongoDBBsonError,
+
+    #[error("MongoDB error")]
+    MongoDBBsonDeError,
 }
 
 impl From<MongoDBBsonError> for StorageServiceError {
@@ -21,5 +24,12 @@ impl From<mongodb::error::Error> for StorageServiceError {
     fn from(err: mongodb::error::Error) -> Self {
         log::debug!("mongodb::error::Error: {}", err);
         return StorageServiceError::MongoDBError;
+    }
+}
+
+impl From<mongodb::bson::de::Error> for StorageServiceError {
+    fn from(err: mongodb::bson::de::Error) -> Self {
+        log::debug!("mongodb::bson::de::Error: {}", err);
+        return StorageServiceError::MongoDBBsonDeError;
     }
 }

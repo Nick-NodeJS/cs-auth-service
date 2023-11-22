@@ -57,6 +57,9 @@ impl UserService {
             .get_user_by_google_id(&google_profile.user_id)
             .await?
         {
+            self.storage_service
+                .update_user_by_id_with_google_profile(user.id, google_profile)
+                .await?;
             Ok(user)
         } else {
             let new_user = User::new(

@@ -3,15 +3,15 @@ use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct GoogleProfile {
     pub user_id: String,
-    pub name: Option<String>,
+    pub name: String,
     pub email: String,
+    pub email_verified: bool,
+    pub picture: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct FacebookProfile {
     pub user_id: String,
     pub name: Option<String>,
@@ -31,16 +31,17 @@ pub enum UserActiveProfile {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct User {
-    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
-    id: Option<ObjectId>,
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
     active_profile: UserActiveProfile,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     google: Option<GoogleProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     facebook: Option<FacebookProfile>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
+    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
     updated_at: DateTime<Utc>,
 }
 
@@ -48,7 +49,7 @@ impl User {
     pub fn new(active_profile: UserActiveProfile, profile: UserProfile) -> User {
         let now = Utc::now();
         let mut user = User {
-            id: Some(ObjectId::new()),
+            id: ObjectId::new(),
             active_profile,
             google: None,
             facebook: None,

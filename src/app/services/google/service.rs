@@ -201,8 +201,10 @@ impl GoogleService {
 
         Ok(GoogleProfile {
             user_id: token_data.sub,
-            name: Some(token_data.name),
+            name: token_data.name,
             email: token_data.email,
+            email_verified: token_data.email_verified,
+            picture: token_data.picture,
         })
     }
 
