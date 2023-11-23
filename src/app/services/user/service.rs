@@ -37,9 +37,9 @@ impl UserService {
         user_profile: UserProfile,
     ) -> Result<User, UserServiceError> {
         if let Some(user) = self.get_user_by_profile(user_profile.clone()).await? {
-            let query = User::get_update_user_profile_query(user_profile);
+            let query = UserRepository::get_update_user_profile_query(user_profile);
             self.user_repository
-                .update_user(User::get_find_user_by_id_query(user.id), query)
+                .update_user(UserRepository::get_find_user_by_id_query(user.id), query)
                 .await?;
             Ok(user)
         } else {
@@ -53,7 +53,7 @@ impl UserService {
         &self,
         user_profile: UserProfile,
     ) -> Result<Option<User>, UserServiceError> {
-        let query = User::get_find_user_by_profile_query(user_profile);
+        let query = UserRepository::get_find_user_by_profile_query(user_profile);
         Ok(self.user_repository.get_user(query).await?)
     }
 }
