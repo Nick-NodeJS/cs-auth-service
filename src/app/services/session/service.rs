@@ -2,18 +2,19 @@ use bson::oid::ObjectId;
 
 use crate::app::{
     models::{common::AuthProviders, session::Session},
+    repositories::session::repository::SessionRepository,
     services::cache::service::CacheService,
 };
 
 use super::error::SessionServiceError;
 
 pub struct SessionService {
-    cache_service: CacheService,
+    repository: SessionRepository,
 }
 
 impl SessionService {
-    pub async fn new(cache_service: CacheService) -> Result<Self, SessionServiceError> {
-        Ok(SessionService { cache_service })
+    pub async fn new(repository: SessionRepository) -> Result<Self, SessionServiceError> {
+        Ok(SessionService { repository })
     }
 
     pub async fn get_session(&self, user_id: &str) -> Result<Option<Session>, SessionServiceError> {

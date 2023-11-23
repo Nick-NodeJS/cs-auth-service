@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::app::services::storage::error::StorageServiceError;
+use crate::app::repositories::user::error::UserRepositoryError;
 
 #[derive(Debug, Error)]
 pub enum UserServiceError {
@@ -11,9 +11,9 @@ pub enum UserServiceError {
     StorageServiceError,
 }
 
-impl From<StorageServiceError> for UserServiceError {
-    fn from(err: StorageServiceError) -> Self {
-        log::debug!("StorageServiceError: {:?}", err);
+impl From<UserRepositoryError> for UserServiceError {
+    fn from(err: UserRepositoryError) -> Self {
+        log::debug!("UserRepositoryError: {:?}", err);
         return UserServiceError::StorageServiceError;
     }
 }

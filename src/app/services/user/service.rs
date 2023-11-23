@@ -1,13 +1,13 @@
 use crate::app::{
     models::user::{User, UserProfile},
+    repositories::user::repository::UserRepository,
     services::{cache::service::CacheService, storage::service::StorageService},
 };
 
 use super::error::UserServiceError;
 
 pub struct UserService {
-    cache_service: CacheService,
-    storage_service: StorageService,
+    user_repository: UserRepository,
 }
 
 impl UserService {
@@ -15,17 +15,19 @@ impl UserService {
         cache_service: CacheService,
         storage_service: StorageService,
     ) -> Result<Self, UserServiceError> {
-        Ok(UserService {
+        let user_repository = UserRepository::new(
+            storage_service.config.user_collection.clone(),
             cache_service,
             storage_service,
-        })
+        );
+        Ok(UserService { user_repository })
     }
 
     // TODO:
     // - check it in sessions
     pub async fn check_if_user_logged_in(
         &self,
-        user_id: String,
+        user_profile: UserProfile,
     ) -> Result<Option<String>, UserServiceError> {
         Ok(Some("fake_refresh_token".to_string()))
     }
@@ -36,13 +38,13 @@ impl UserService {
     ) -> Result<User, UserServiceError> {
         if let Some(user) = self.get_user_by_profile(user_profile.clone()).await? {
             let query = User::get_update_user_profile_query(user_profile);
-            self.storage_service
+            self.user_repository
                 .update_user(User::get_find_user_by_id_query(user.id), query)
                 .await?;
             Ok(user)
         } else {
             let new_user = User::new(user_profile);
-            self.storage_service.insert_user(new_user.clone()).await?;
+            self.user_repository.insert_user(new_user.clone()).await?;
             Ok(new_user)
         }
     }
@@ -52,6 +54,6 @@ impl UserService {
         user_profile: UserProfile,
     ) -> Result<Option<User>, UserServiceError> {
         let query = User::get_find_user_by_profile_query(user_profile);
-        Ok(self.storage_service.get_user(query).await?)
+        Ok(self.user_repository.get_user(query).await?)
     }
 }

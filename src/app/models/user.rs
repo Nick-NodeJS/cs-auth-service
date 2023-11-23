@@ -3,6 +3,8 @@ use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
 
+use crate::app::services::storage::service::CollectionType;
+
 use super::common::AuthProviders;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -103,3 +105,5 @@ impl User {
         }
     }
 }
+
+impl CollectionType for User {}

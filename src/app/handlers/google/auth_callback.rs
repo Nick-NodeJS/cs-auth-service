@@ -33,7 +33,7 @@ pub async fn auth_callback(
             user_profile.user_id
         );
         if let Some(google_refresh_token) = user_service
-            .check_if_user_logged_in(user_profile.user_id.clone())
+            .check_if_user_logged_in(UserProfile::Google(user_profile.clone()))
             .await?
         {
             user_service
@@ -49,9 +49,8 @@ pub async fn auth_callback(
             google_service
                 .revoke_token(tokens.access_token.clone())
                 .await?;
-            return Ok(
-                HttpResponse::Unauthorized().json(error_as_json("User should relogin".to_string()))
-            );
+            return Ok(HttpResponse::Unauthorized()
+                .json(error_as_json("User should relogin to Google".to_string())));
         }
     }
 }

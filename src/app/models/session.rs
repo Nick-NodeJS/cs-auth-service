@@ -26,7 +26,7 @@ impl Session {
             updated_at: now,
         }
     }
-    pub fn get_session_key(session: Session) -> &'static str {
-        ""
+    pub fn get_session_key(user_id: ObjectId, auth_provider: AuthProviders) -> String {
+        format!("session::{}::{:?}", user_id, auth_provider)
     }
 }

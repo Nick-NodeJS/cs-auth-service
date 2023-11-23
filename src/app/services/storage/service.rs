@@ -8,8 +8,9 @@ use crate::config::mongodb_config::MongoDBConfig;
 
 use super::error::StorageServiceError;
 
+pub trait CollectionType {}
 pub struct StorageService {
-    config: MongoDBConfig,
+    pub config: MongoDBConfig,
     database: Database,
 }
 
@@ -28,38 +29,7 @@ impl StorageService {
         Ok(StorageService { config, database })
     }
 
-    pub async fn get_user(&self, query: Document) -> Result<Option<User>, StorageServiceError> {
-        // TODO: implement caching on this level
-
-        let mut raw_user = self.get_users_collection().find(query, None).await?;
-        if raw_user.advance().await? {
-            let user = bson::from_slice(raw_user.current().as_bytes())?;
-            Ok(Some(user))
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub async fn update_user(
-        &self,
-        filter: Document,
-        data_to_update: Document,
-    ) -> Result<(), StorageServiceError> {
-        // TODO: implement caching on this level
-        self.get_users_collection()
-            .find_one_and_update(filter, doc! { "$set": data_to_update }, None)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn insert_user(&self, user: User) -> Result<(), StorageServiceError> {
-        // TODO: check if it returns _id which is the same as user._id
-        self.get_users_collection().insert_one(user, None).await?;
-        Ok(())
-    }
-
-    fn get_users_collection(&self) -> Collection<User> {
-        self.database
-            .collection::<User>(&self.config.user_collection)
+    pub fn get_collection<T: CollectionType>(&self, collection_name: &str) -> Collection<T> {
+        self.database.collection::<T>(collection_name)
     }
 }

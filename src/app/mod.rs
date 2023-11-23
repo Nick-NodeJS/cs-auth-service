@@ -2,6 +2,7 @@ mod app_data;
 mod app_error;
 mod handlers;
 mod models;
+mod repositories;
 mod services;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
