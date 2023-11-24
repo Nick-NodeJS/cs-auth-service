@@ -41,12 +41,26 @@ impl UserRepository {
         &self,
         filter: Document,
         data_to_update: Document,
-    ) -> Result<(), UserRepositoryError> {
+    ) -> Result<User, UserRepositoryError> {
         // TODO: implement caching on this level
-        self.get_collection()
-            .find_one_and_update(filter, doc! { "$set": data_to_update }, None)
-            .await?;
-        Ok(())
+        if let Some(user) = self
+            .get_collection()
+            .find_one_and_update(
+                filter.clone(),
+                doc! { "$set": data_to_update.clone() },
+                None,
+            )
+            .await?
+        {
+            Ok(user)
+        } else {
+            log::error!(
+                "Error to update user. filter: {}, data: {}",
+                filter,
+                data_to_update
+            );
+            Err(UserRepositoryError::UpdateUserError)
+        }
     }
 
     pub async fn insert_user(&self, user: User) -> Result<(), UserRepositoryError> {

@@ -1,6 +1,9 @@
+use bson::oid::ObjectId;
+
 use crate::app::{
     models::{
         common::AuthProviders,
+        session::Session,
         user::{User, UserProfile},
     },
     repositories::{session::repository::SessionRepository, user::repository::UserRepository},
@@ -34,30 +37,44 @@ impl UserService {
     // TODO:
     // - check it in sessions
     pub async fn check_if_user_logged_in_with_profile(
-        &self,
+        &mut self,
         user_profile: UserProfile,
-    ) -> Result<Option<String>, UserServiceError> {
-        Ok(Some("fake_refresh_token".to_string()))
+    ) -> Result<Option<Session>, UserServiceError> {
+        if let Some(existen_user) = self.get_user_by_profile(user_profile.clone()).await? {
+            if let Some(session) = self
+                .session_service
+                .get_session(existen_user.id, UserProfile::get_provider(user_profile))
+                .await?
+            {
+                Ok(Some(session))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
     }
 
-    pub async fn create_or_update_user_with_profile(
+    pub async fn create_user_with_profile(
         &self,
         user_profile: UserProfile,
     ) -> Result<User, UserServiceError> {
-        if let Some(existen_user) = self.get_user_by_profile(user_profile.clone()).await? {
-            let query = UserRepository::get_update_user_profile_query(user_profile);
-            self.user_repository
-                .update_user(
-                    UserRepository::get_find_user_by_id_query(existen_user.id),
-                    query,
-                )
-                .await?;
-            Ok(existen_user)
-        } else {
-            let new_user = User::new(user_profile);
-            self.user_repository.insert_user(new_user.clone()).await?;
-            Ok(new_user)
-        }
+        let new_user = User::new(user_profile);
+        self.user_repository.insert_user(new_user.clone()).await?;
+        Ok(new_user)
+    }
+
+    pub async fn update_user_with_profile(
+        &self,
+        user_id: ObjectId,
+        user_profile: UserProfile,
+    ) -> Result<User, UserServiceError> {
+        let query = UserRepository::get_update_user_profile_query(user_profile);
+        let user = self
+            .user_repository
+            .update_user(UserRepository::get_find_user_by_id_query(user_id), query)
+            .await?;
+        Ok(user)
     }
 
     pub async fn get_user_by_profile(
@@ -68,24 +85,27 @@ impl UserService {
         Ok(self.user_repository.get_user(query).await?)
     }
 
-    pub async fn set_user_session(
-        &self,
-        user: User,
-        auth_provider: AuthProviders,
-        token: String,
-    ) -> Result<(), UserServiceError> {
-        Ok(())
-    }
-
-    pub async fn set_user_and_session(
-        &self,
+    pub async fn create_user_and_session(
+        &mut self,
         user_profile: UserProfile,
         token: String,
     ) -> Result<(), UserServiceError> {
-        let user = self
-            .create_or_update_user_with_profile(user_profile.clone())
+        let user = self.create_user_with_profile(user_profile.clone()).await?;
+        self.session_service
+            .set_session(UserProfile::get_provider(user_profile), user.id, token)
             .await?;
-        self.set_user_session(user, UserProfile::get_provider(user_profile), token)
+        Ok(())
+    }
+
+    pub async fn update_user_and_session(
+        &mut self,
+        user_profile: UserProfile,
+        user_session: Session,
+    ) -> Result<(), UserServiceError> {
+        self.update_user_with_profile(user_session.user_id.clone(), user_profile.clone())
+            .await?;
+        self.session_service
+            .update_session(user_session, None)
             .await?;
         Ok(())
     }

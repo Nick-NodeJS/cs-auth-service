@@ -12,8 +12,12 @@ pub enum UserRepositoryError {
 
     #[error("MongoDB error")]
     MongoDBBsonDeError,
+
     #[error("Redis error")]
     RedisError,
+
+    #[error("UpdateUser error")]
+    UpdateUserError,
 }
 
 impl From<RedisError> for UserRepositoryError {

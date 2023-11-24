@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 
-use redis::{Client, Connection};
+use redis::{Client, Connection, FromRedisValue, RedisResult, ToRedisArgs};
 use redis::{Commands, RedisError};
+use serde_json::Value;
 
 use crate::config::redis_config::RedisConfig;
 
@@ -17,12 +20,17 @@ impl CacheService {
         Ok(CacheService { client })
     }
 
-    // For future use
-    // pub async fn set_value(&self, key: &str, value: &str) -> Result<(), redis::RedisError> {
-    //     let mut connection = self.client.get_async_connection().await?;
-    //     connection.set(key, value).await?;
-    //     Ok(())
-    // }
+    pub fn hmset(&mut self, key: &str, items: &[(&str, String)]) -> Result<(), RedisError> {
+        let mut connection = self.get_connection()?;
+        connection.hset_multiple(key, items)?;
+        Ok(())
+    }
+
+    pub fn hmget(&mut self, key: &str) -> Result<HashMap<String, String>, RedisError> {
+        let mut connection = self.get_connection()?;
+        let result: HashMap<String, String> = connection.hgetall(key)?;
+        Ok(result)
+    }
 
     pub fn set_value_with_ttl(
         &mut self,
