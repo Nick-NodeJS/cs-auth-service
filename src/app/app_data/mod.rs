@@ -1,4 +1,3 @@
-use crate::config::google_config::GoogleConfig;
 use std::sync::{Arc, Mutex};
 
 use super::{
@@ -28,7 +27,7 @@ impl AppData {
 
         let google_service = GoogleService::new(cache_service.clone()).await?;
 
-        let user_service = UserService::new(cache_service, storage_service)?;
+        let user_service = UserService::new(cache_service, storage_service);
 
         let app_data = AppData {
             google_service: Arc::new(Mutex::new(google_service)),

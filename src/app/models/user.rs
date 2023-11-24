@@ -1,4 +1,4 @@
-use bson::{doc, Document};
+use bson::doc;
 use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
@@ -27,6 +27,15 @@ pub struct FacebookProfile {
 pub enum UserProfile {
     Google(GoogleProfile),
     Facebook(FacebookProfile),
+}
+
+impl UserProfile {
+    pub fn get_provider(profile: UserProfile) -> AuthProviders {
+        match profile {
+            UserProfile::Google(_) => AuthProviders::Google,
+            UserProfile::Facebook(_) => AuthProviders::Facebook,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

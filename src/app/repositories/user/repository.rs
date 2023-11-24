@@ -2,13 +2,11 @@ use bson::oid::ObjectId;
 use bson::Document;
 use chrono::Utc;
 use mongodb::bson::{self, doc};
-use mongodb::options::ClientOptions;
-use mongodb::{Client, Collection, Database};
+use mongodb::Collection;
 
 use crate::app::models::user::{User, UserProfile};
 use crate::app::services::cache::service::CacheService;
 use crate::app::services::storage::service::StorageService;
-use crate::config::mongodb_config::MongoDBConfig;
 
 use super::error::UserRepositoryError;
 

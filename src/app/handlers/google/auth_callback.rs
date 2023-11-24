@@ -24,7 +24,7 @@ pub async fn auth_callback(
     // TODO: during adding a new or updating an existen user it should set session data(refresh token, login timestamp etc)
     if let Some(refresh_token) = tokens.refresh_token {
         user_service
-            .create_or_update_user_with_profile(UserProfile::Google(user_profile))
+            .set_user_and_session(UserProfile::Google(user_profile), refresh_token.clone())
             .await?;
         return Ok(HttpResponse::Ok().json(tokens_as_json((tokens.access_token, refresh_token))));
     } else {
@@ -32,15 +32,19 @@ pub async fn auth_callback(
             "\nUser id: {} google token response has no refresh token\n",
             user_profile.user_id
         );
-        if let Some(google_refresh_token) = user_service
-            .check_if_user_logged_in(UserProfile::Google(user_profile.clone()))
+        // TODO: get user session on this step and use it in set_user_and_session
+        if let Some(existen_refresh_token) = user_service
+            .check_if_user_logged_in_with_profile(UserProfile::Google(user_profile.clone()))
             .await?
         {
             user_service
-                .create_or_update_user_with_profile(UserProfile::Google(user_profile))
+                .set_user_and_session(
+                    UserProfile::Google(user_profile),
+                    existen_refresh_token.clone(),
+                )
                 .await?;
             return Ok(HttpResponse::Ok()
-                .json(tokens_as_json((tokens.access_token, google_refresh_token))));
+                .json(tokens_as_json((tokens.access_token, existen_refresh_token))));
         } else {
             log::warn!(
                 "\nGoogle user id: {} has no refresh token. Should relogin\n",

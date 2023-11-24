@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use bson::oid::ObjectId;
-
 use crate::app::{models::session::Session, services::cache::service::CacheService};
 
 use super::error::SessionRepositoryError;
@@ -11,8 +9,8 @@ pub struct SessionRepository {
 }
 
 impl SessionRepository {
-    pub async fn new(storage: CacheService) -> Result<Self, SessionRepositoryError> {
-        Ok(SessionRepository { storage })
+    pub fn new(storage: CacheService) -> Self {
+        SessionRepository { storage }
     }
 
     pub async fn get_session(

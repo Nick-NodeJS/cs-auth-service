@@ -3,7 +3,6 @@ use bson::oid::ObjectId;
 use crate::app::{
     models::{common::AuthProviders, session::Session},
     repositories::session::repository::SessionRepository,
-    services::cache::service::CacheService,
 };
 
 use super::error::SessionServiceError;
@@ -13,8 +12,8 @@ pub struct SessionService {
 }
 
 impl SessionService {
-    pub async fn new(repository: SessionRepository) -> Result<Self, SessionServiceError> {
-        Ok(SessionService { repository })
+    pub fn new(repository: SessionRepository) -> Self {
+        SessionService { repository }
     }
 
     pub async fn get_session(&self, user_id: &str) -> Result<Option<Session>, SessionServiceError> {
@@ -30,7 +29,7 @@ impl SessionService {
         Ok(())
     }
 
-    pub async fn insert_session(
+    pub async fn set_session(
         &self,
         auth_provider: AuthProviders,
         user_id: ObjectId,

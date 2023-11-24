@@ -97,7 +97,7 @@ impl GoogleService {
         self.cache_service.set_value_with_ttl(
             csrf_state,
             &pkce_code_verifier,
-            self.config.google_redis_state_ttl_ms as usize,
+            self.config.google_redis_state_ttl_sec as usize,
         )?;
         Ok(())
     }

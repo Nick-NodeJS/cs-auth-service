@@ -12,7 +12,7 @@ pub struct GoogleConfig {
     pub google_redirect_url: String,
     pub google_plus_me_url: String,
     pub google_cert_url: String,
-    pub google_redis_state_ttl_ms: u32,
+    pub google_redis_state_ttl_sec: u32,
     pub google_test_token: String,
 }
 
@@ -37,8 +37,8 @@ impl GoogleConfig {
             .expect("Missing the GOOGLE_PLUS_ME_URL environment variable.");
         let google_cert_url = dotenv::var("GOOGLE_CERT_URL")
             .expect("Missing the GOOGLE_CERT_URL environment variable.");
-        let google_redis_state_ttl_ms: u32 = dotenv::var("GOOGLE_STATE_REDIS_TTL_MS")
-            .expect("GOOGLE_STATE_REDIS_TTL_MS environment variable is not set")
+        let google_redis_state_ttl_sec: u32 = dotenv::var("GOOGLE_STATE_REDIS_TTL_SEC")
+            .expect("GOOGLE_STATE_REDIS_TTL_SEC environment variable is not set")
             .parse()
             .expect("Invalid GOOGLE_STATE_REDIS_TTL_MS");
         let google_test_token = dotenv::var("GOOGLE_TEST_TOKEN")
@@ -46,7 +46,7 @@ impl GoogleConfig {
 
         // Validate TTL in milliseconds to keep Google OAuth2 state in Redis
         // make sense to keep it not more than 3 min
-        if !validate_integer_in_range(google_redis_state_ttl_ms, 1, 3 * 60 * 1000) {
+        if !validate_integer_in_range(google_redis_state_ttl_sec, 1, 3 * 60) {
             panic!("GOOGLE_STATE_REDIS_TTL_MS out of the range");
         }
 
@@ -59,7 +59,7 @@ impl GoogleConfig {
             google_redirect_url,
             google_plus_me_url,
             google_cert_url,
-            google_redis_state_ttl_ms,
+            google_redis_state_ttl_sec,
             google_test_token,
         }
     }

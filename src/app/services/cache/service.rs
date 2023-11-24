@@ -28,10 +28,10 @@ impl CacheService {
         &mut self,
         key: &str,
         value: &str,
-        milliseconds: usize,
+        seconds: usize,
     ) -> Result<(), RedisError> {
         let mut connection = self.get_connection()?;
-        connection.set_ex(key, value, milliseconds)?;
+        connection.set_ex(key, value, seconds)?;
         Ok(())
     }
 
