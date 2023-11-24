@@ -1,56 +1,60 @@
-use redis::Commands;
+use actix_web::{web, HttpRequest, HttpResponse};
 
-use actix_web::{HttpRequest, HttpResponse, web};
+use crate::app::{
+    app_data::AppData,
+    app_error::AppError,
+    models::user::UserProfile,
+    services::common::{error_as_json, tokens_as_json},
+};
 
-use crate::app::app_data::AppData;
+pub async fn auth_callback(
+    req: HttpRequest,
+    app_data: web::Data<AppData>,
+) -> Result<HttpResponse, AppError> {
+    let mut google_service = app_data.google_service.lock()?;
+    let user_service = app_data.user_service.lock()?;
+    let (code, state) = google_service.parse_auth_query_string(req.query_string())?;
 
-pub async fn auth_callback(req: HttpRequest, app_data: web::Data<AppData>) -> HttpResponse {
-  let mut redis_connection = match app_data.redis_connection.lock() {
-    Ok(connection) => connection,
-    Err(err) => return google_bad_request_error(err.to_string()),
-  };
-  let google_service_lock = &app_data.google_service.lock();
-  let google_service = match google_service_lock {
-    Ok(mutex_google_service) => mutex_google_service,
-    Err(err) => return google_bad_request_error(err.to_string()),
-  };
-  match google_service.parse_query_string(req.query_string()) {
-      Ok((code, state)) => {
-        // process code + state
-        let try_code: Option<String> = match redis_connection.get(state.clone()) {
-          Ok(cache_code) => cache_code,
-          Err(err) => return google_bad_request_error(err.to_string()),
-        };
-        if let Some(pkce_code_verifier) = try_code {
-          match google_service.get_tokens(code, pkce_code_verifier).await {
-            Ok(tokens) => {
-              if let Err(err) = google_service.set_user_to_storage(&tokens/*, redis_connection*/).await {
-                return google_bad_request_error(
-                  format!("Error to set tokens to storage: {}",err)
+    // process code and state to get tokens
+    let tokens = google_service.get_tokens(code, state).await?;
+    let user_profile = google_service.get_user_profile(&tokens.id_token).await?;
+
+    // in case Google API returns no refresh token, it has to check if user was logged in before
+    // if No(google refresh token is not in system) - it revoke the token and user has to relogin to Google
+    // TODO: during adding a new or updating an existen user it should set session data(refresh token, login timestamp etc)
+    if let Some(refresh_token) = tokens.refresh_token {
+        user_service
+            .set_user_and_session(UserProfile::Google(user_profile), refresh_token.clone())
+            .await?;
+        return Ok(HttpResponse::Ok().json(tokens_as_json((tokens.access_token, refresh_token))));
+    } else {
+        log::warn!(
+            "\nUser id: {} google token response has no refresh token\n",
+            user_profile.user_id
+        );
+        // TODO: get user session on this step and use it in set_user_and_session
+        if let Some(existen_refresh_token) = user_service
+            .check_if_user_logged_in_with_profile(UserProfile::Google(user_profile.clone()))
+            .await?
+        {
+            user_service
+                .set_user_and_session(
+                    UserProfile::Google(user_profile),
+                    existen_refresh_token.clone(),
                 )
-              }
-              return HttpResponse::Ok().json(google_service.tokens_as_json(tokens));
-            },
-            Err(err) => {
-              return google_bad_request_error(err);
-            },
-          }
+                .await?;
+            return Ok(HttpResponse::Ok()
+                .json(tokens_as_json((tokens.access_token, existen_refresh_token))));
         } else {
-          return google_bad_request_error(
-            format!("No callback request state {} in Redis", state)
-          )
+            log::warn!(
+                "\nGoogle user id: {} has no refresh token. Should relogin\n",
+                user_profile.user_id
+            );
+            google_service
+                .revoke_token(tokens.access_token.clone())
+                .await?;
+            return Ok(HttpResponse::Unauthorized()
+                .json(error_as_json("User should relogin to Google".to_string())));
         }
-      },
-      Err(error_msg) => {
-        return google_bad_request_error(
-          format!("Error to parse Google callback request query string: {}", error_msg)
-        )
-      },
-  }
-}
-
-// TODO: optimize it
-fn google_bad_request_error(err: String) -> HttpResponse {
-  log::error!("Bad Google request: {}", err);
-  return HttpResponse::BadRequest().body("Bad Google request or unable to proccess it");
+    }
 }

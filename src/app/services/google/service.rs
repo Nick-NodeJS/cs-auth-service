@@ -1,271 +1,297 @@
 use std::collections::HashMap;
-use std::sync::MutexGuard;
+use std::str::FromStr;
 
-use actix_web::error::PayloadError;
+use actix_web::http::Method;
 use actix_web::web;
-use awc::Client;
-use awc::error::SendRequestError;
-use cs_shared_lib::redis as Redis;
+use awc::error::HeaderValue;
+use base64::Engine;
 use jsonwebtoken as jwt;
-use jwt::{decode, Validation, DecodingKey, Algorithm, TokenData};
-use redis::Connection as RedisConnection;
+use jwt::{decode, Algorithm, DecodingKey, TokenData, Validation};
+use oauth2::http::HeaderMap;
 
-use oauth2::url::Url;
 use oauth2::basic::BasicClient;
-use oauth2::{
-    AuthUrl, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, RedirectUrl,
-    RevocationUrl, Scope, TokenUrl, AuthorizationCode, PkceCodeVerifier, TokenResponse,
-};
 use oauth2::reqwest::async_http_client;
-use serde::{Serialize, Deserialize};
-use serde_json::{Map, Value};
+use oauth2::url::Url;
+use oauth2::{
+    AuthUrl, ClientId, ClientSecret, CsrfToken, HttpRequest, PkceCodeChallenge, RedirectUrl,
+    RevocationUrl, Scope, TokenUrl,
+};
 
+use crate::app::models::user::GoogleProfile;
+use crate::app::services::cache::service::CacheService;
 use crate::config::google_config::GoogleConfig;
+
+use super::error::GoogleServiceError;
+use super::structures::{GoogleKeys, GoogleTokens, TokenClaims, TokenHeaderObject};
 
 pub struct GoogleService {
     oauth2_client: BasicClient,
+    cache_service: CacheService,
     config: GoogleConfig,
-    google_oauth2_decoding_key: Option<DecodingKey>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    // Add the fields you need from the token here
-    iss: String,
-    sub: String,
-    aud: String,
-    exp: usize,
-    iat: usize,
+    google_oauth2_decoding_keys: HashMap<String, DecodingKey>,
 }
 
 impl GoogleService {
-    pub fn new(config: GoogleConfig) -> Self {
-      let google_client_id = ClientId::new(config.google_client_id.to_string());
-      let google_client_secret = ClientSecret::new(config.google_client_secret.to_string());
-      let oauth_url = AuthUrl::new(config.google_oauth_url.to_string())
-          .expect("Invalid authorization endpoint URL");
-      let token_url = TokenUrl::new(config.google_token_url.to_string())
-          .expect("Invalid token endpoint URL");
-  
-      // Set up the config for the Google OAuth2 process.
-      let client = BasicClient::new(
-          google_client_id,
-          Some(google_client_secret),
-          oauth_url,
-          Some(token_url),
-      )
-      .set_redirect_uri(
-          RedirectUrl::new(config.google_redirect_url.to_string())
-              .expect("Invalid redirect URL"),
-      )
-      // Google supports OAuth 2.0 Token Revocation (RFC-7009)
-      .set_revocation_uri(
-          RevocationUrl::new(config.google_revoke_url.to_string())
-              .expect("Invalid revocation endpoint URL"),
-      );
-      let google_oauth2_decoding_key: Option<DecodingKey> = None;
+    pub async fn new(cache_service: CacheService) -> Result<Self, GoogleServiceError> {
+        let config = GoogleConfig::new();
+        let google_client_id = ClientId::new(config.google_client_id.to_string());
+        let google_client_secret = ClientSecret::new(config.google_client_secret.to_string());
+        let oauth_url = AuthUrl::new(config.google_oauth_url.to_string())
+            .expect("Invalid authorization endpoint URL");
+        let token_url =
+            TokenUrl::new(config.google_token_url.to_string()).expect("Invalid token endpoint URL");
 
-      GoogleService {
-        oauth2_client: client,
-        config,
-        google_oauth2_decoding_key,
-      }
+        // Set up the config for the Google OAuth2 process.
+        let client = BasicClient::new(
+            google_client_id,
+            Some(google_client_secret),
+            oauth_url,
+            Some(token_url),
+        )
+        .set_redirect_uri(
+            RedirectUrl::new(config.google_redirect_url.to_string()).expect("Invalid redirect URL"),
+        )
+        // Google supports OAuth 2.0 Token Revocation (RFC-7009)
+        .set_revocation_uri(
+            RevocationUrl::new(config.google_revoke_url.to_string())
+                .expect("Invalid revocation endpoint URL"),
+        );
+        let google_oauth2_decoding_keys = get_google_oauth2_keys(&config.google_cert_url).await?;
+
+        Ok(GoogleService {
+            oauth2_client: client,
+            cache_service,
+            config,
+            google_oauth2_decoding_keys,
+        })
     }
 
-    pub async fn init(&mut self) -> Result<(), String> {
-      return Ok(());
-      /*match get_google_oauth2_sert(&self.config.google_cert_url).await {
-        Ok(google_oauth2_decoding_key) => {
-          self.google_oauth2_decoding_key = Some(google_oauth2_decoding_key);
-          return Ok(())
-        },
-        Err(err) => {
-          return Err(format!("Error to get Google OAuth2 sertificate: {}", err));
+    pub fn get_authorization_url_data(&self) -> (Url, CsrfToken, String) {
+        // Google supports Proof Key for Code Exchange (PKCE - https://oauth.net/2/pkce/).
+        // Create a PKCE code verifier and SHA-256 encode it as a code challenge.
+        let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
+        let (authorize_url, csrf_state) = self
+            .oauth2_client
+            .authorize_url(CsrfToken::new_random)
+            // This is requesting access to the user's profile.
+            .add_scope(Scope::new("openid".to_string()))
+            .add_scope(Scope::new("profile".to_string()))
+            .add_scope(Scope::new("email".to_string()))
+            .add_extra_param("access_type", "offline")
+            .set_pkce_challenge(pkce_code_challenge)
+            .url();
+        return (
+            authorize_url,
+            csrf_state,
+            pkce_code_verifier.secret().to_string(),
+        );
+    }
+
+    pub fn set_auth_data_to_cache(
+        &mut self,
+        csrf_state: &str,
+        pkce_code_verifier: &str,
+    ) -> Result<(), GoogleServiceError> {
+        // get redis service and set auth data in cache
+        // let mut cache_service = app_data.cache_service.lock()?;
+        self.cache_service.set_value_with_ttl(
+            csrf_state,
+            &pkce_code_verifier,
+            self.config.google_redis_state_ttl_sec as usize,
+        )?;
+        Ok(())
+    }
+
+    pub fn get_pkce_code_verifier(&mut self, state: &str) -> Result<String, GoogleServiceError> {
+        // process code and state
+        let try_code: Option<String> = self.cache_service.get_value(state.clone().as_ref())?;
+        if let Some(pkce_code_verifier_from_cache) = try_code {
+            Ok(pkce_code_verifier_from_cache)
+        } else {
+            log::debug!("No callback request state {} in Redis", state);
+            return Err(GoogleServiceError::CallbackStateCacheError);
         }
-      }*/
     }
 
-    pub fn get_authorization_url_data(&self) -> (Url, CsrfToken, String, u32) {
-      // Google supports Proof Key for Code Exchange (PKCE - https://oauth.net/2/pkce/).
-      // Create a PKCE code verifier and SHA-256 encode it as a code challenge.
-      let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
-      let (authorize_url, csrf_state) = self.oauth2_client
-        .authorize_url(CsrfToken::new_random)
-        // This example is requesting access to the user's profile.
-        .add_scope(Scope::new(
-            "https://www.googleapis.com/auth/plus.me".to_string(),
-        ))
-        .set_pkce_challenge(pkce_code_challenge)
-        .url();
-      return (
-        authorize_url,
-        csrf_state,
-        pkce_code_verifier.secret().to_string(),
-        self.config.google_redis_state_ttl_ms,
-      );
+    /// It makes http request to GAPI and gets access token and refresh token.
+    /// If user was registered during the test flow, you have to go to
+    /// https://myaccount.google.com/connections?hl=en
+    /// and delete all connection with this app to be able to receive refresh token,
+    /// in another way it always returns access token only (tested 03.11.2023)
+    pub async fn get_tokens(
+        &mut self,
+        code: String,
+        state: String,
+    ) -> Result<GoogleTokens, GoogleServiceError> {
+        // get pkce_code_verifier
+        let pkce_code_verifier = self.get_pkce_code_verifier(&state)?;
+        // Exchange the code with a token.
+
+        // oauth2::BasicClient doesn't have in StandartTokenResponse "id_token"
+        // that's why we use common async_http_client
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "Content-Type",
+            HeaderValue::from_static("application/x-www-form-urlencoded"),
+        );
+        let url = Url::from_str(&self.config.google_token_url)?;
+        log::debug!(
+            "\ncode: {},\npkce_code_verifier: {}\n",
+            code,
+            pkce_code_verifier
+        );
+        let params: Vec<(&str, &str)> = vec![
+            ("code", &code),
+            ("client_id", &self.config.google_client_id),
+            ("client_secret", &self.config.google_client_secret),
+            ("redirect_uri", &self.config.google_redirect_url),
+            ("grant_type", "authorization_code"),
+            ("code_verifier", &pkce_code_verifier),
+        ];
+        let response = async_http_client(HttpRequest {
+            method: Method::POST,
+            url,
+            headers,
+            body: url::form_urlencoded::Serializer::new(String::new())
+                .extend_pairs(params)
+                .finish()
+                .into_bytes(),
+        })
+        .await
+        .map_err(|err| format!("Get token request error: {err}"))?;
+
+        if !response.status_code.is_success() {
+            log::error!(
+                "Tokens request error, response body: {:?}",
+                String::from_utf8_lossy(&response.body)
+            );
+            return Err(GoogleServiceError::OAuth2RequestTokenError);
+        }
+        let result = serde_json::from_slice::<GoogleTokens>(&response.body)?;
+        log::debug!("\nGoogle token response: {:?}\n", result);
+        // TODO: reimplement json body parsing more efficient to get strings without extra symbols(")
+        Ok(result)
     }
 
-    pub async fn get_tokens(&self, code: String, pkce_code_verifier: String) -> Result<(String, String), String> {
-      // Exchange the code with a token.
-      match self.oauth2_client
-      .exchange_code(AuthorizationCode::new(code))
-      .set_pkce_verifier(PkceCodeVerifier::new(pkce_code_verifier))
-      .request_async(async_http_client).await {
-        Ok(token_response) => {
-          let access_token = token_response.access_token().secret();
-          println!("Access token: {:?}", access_token);
-          if let Some(refresh_token) = token_response.refresh_token() {
-            return Ok((access_token.to_owned(), refresh_token.secret().to_owned()));
-          } else {
-            return Err("token response doesn't have refresh token".to_string());
-          }
-        },
-        Err(err) => {
-          return Err(err.to_string());
-        },
-      }
+    pub fn get_token_key(&self, token: &str) -> Result<&DecodingKey, GoogleServiceError> {
+        let token_string = token.to_string();
+        let token_parts: Vec<&str> = token_string.split('.').collect();
+        let try_header = token_parts.into_iter().next();
+        match try_header {
+            Some(header) => {
+                let decoded_slice =
+                    base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(header)?;
+                let header_object = serde_json::from_slice::<TokenHeaderObject>(&decoded_slice)?;
+                let try_key = self.google_oauth2_decoding_keys.get(&header_object.kid);
+                if let Some(key) = try_key {
+                    return Ok(key);
+                } else {
+                    return Err(GoogleServiceError::BadTokenStructure);
+                }
+            }
+            None => Err(GoogleServiceError::BadTokenStructure),
+        }
     }
 
-    pub fn get_access_token_user_data(&self, access_token: &str) -> Result<TokenData<Claims>, String> {
-        // Validation configuration
-        let validation = Validation::new(Algorithm::RS256);
+    pub async fn get_user_profile(&self, token: &str) -> Result<GoogleProfile, GoogleServiceError> {
+        let key = self.get_token_key(token)?;
+        let token_data = decode_token(token, key, true)?;
+        log::debug!("\nToken data: {:?}\n", token_data);
 
-        // Decode the Google access token
-        let decoding_key = match &self.google_oauth2_decoding_key {
-          Some(d_key) => d_key,
-          None => return Err("No decoding key on Google Service!".to_string()),
-        };
-
-        let token_data = match decode(
-            access_token,
-            decoding_key,
-            &validation,
-        ) {
-          Ok(t_data) => t_data,
-          Err(err) => return Err(err.to_string()),
-        };
-
-        Ok(token_data)
+        Ok(GoogleProfile {
+            user_id: token_data.sub,
+            name: token_data.name,
+            email: token_data.email,
+            email_verified: token_data.email_verified,
+            picture: token_data.picture,
+        })
     }
 
-    pub fn parse_query_string(&self, query_string: &str) -> Result<(String, String), &str> {
-      let try_params = web::Query::<HashMap<String, String>>::from_query(
-        query_string,
-      );
-      match try_params {
-        Ok(params) => {
-          let code: String;
-          if let Some(code_string) = params.get("code") {
-            code = code_string.to_owned();
-          } else {
-            return Err("Invalid code parameter")
-          };
-          let state: String;
-          if let Some(state_string) = params.get("state") {
-            state = state_string.to_owned();
-          } else {
-            return Err("Invalid code parameter")
-          };
-          return Ok((code, state));
-        },
-        Err(err) => {
-          log::error!("{}", err.to_string());
-          return Err("Invalid query string")
-        },
-      }
+    /// get code and state params from query string
+    pub fn parse_auth_query_string(
+        &self,
+        query_string: &str,
+    ) -> Result<(String, String), GoogleServiceError> {
+        let try_params = web::Query::<HashMap<String, String>>::from_query(query_string);
+        match try_params {
+            Ok(params) => {
+                let code: String;
+                if let Some(code_string) = params.get("code") {
+                    code = code_string.to_owned();
+                } else {
+                    return Err(GoogleServiceError::CodeParamError);
+                };
+                let state: String;
+                if let Some(state_string) = params.get("state") {
+                    state = state_string.to_owned();
+                } else {
+                    return Err(GoogleServiceError::CodeParamError);
+                };
+                return Ok((code, state));
+            }
+            Err(err) => {
+                log::error!("{}", err.to_string());
+                return Err(GoogleServiceError::QueryStringError);
+            }
+        }
     }
 
-    /// #### Actions:
-    /// 1 - decode user data by tokens (GAPI request)
-    /// 
-    /// 2 - create a new or update user in data storage
-    /// 
-    /// 3 - reflect user in cache
-    pub async fn set_user_to_storage(
-      &self,
-      tokens: &(String, String),
-      //  redis_connection: MutexGuard<'_, RedisConnection>,
-    ) -> Result<(), String> {
-      println!("tokens {:?}", tokens);
-      let (access_token, refresh_token) = tokens;
-      let user_data = match self.get_access_token_user_data(access_token) {
-          Ok(data) => data,
-          Err(err) => return Err(err.to_string()), 
-      };
-      println!("User data {:?}", user_data);
-      /* TODO:
-       - update google service to get OAuth2 cert on initial step(method new)
-       - decode access_token -> token data(google service)
-       - create database service
-       - create new user or update existing user in database
-       - set or update cache with token data
-       */
-      return Ok(())
-    }
-
-    /// return tokens as json object
-    /// #### Arguments
-    /// 
-    /// * `tokens` - A Tuple of strings
-    /// 
-    /// ```
-    /// (String, String)
-    /// ```
-    /// 
-    /// where tokens\[0\] is access_token and tokens\[1\] is refresh_token
-    /// 
-    /// #### Response example:
-    /// ```
-    ///  {
-    ///   "access_token": "$access_token",
-    ///   "refresh_token": "$refresh_token"
-    ///   }
-    /// ```
-    pub fn tokens_as_json(&self, tokens: (String, String)) -> Map<String, Value> {
-      let (access_token, refresh_token) = tokens;
-      let mut payload = Map::new();
-      payload.insert("access_token".to_string(), Value::String(access_token));
-      payload.insert("refresh_token".to_string(), Value::String(refresh_token));
-      return payload;
-    }
-
-    pub fn get_state_from_cache(
-      &self,
-      code: String,
-      redis_connection: &mut MutexGuard<'_, RedisConnection>,
-    ) -> Option<String> {
-        match Redis::get_value(redis_connection, &code) {
-          Ok(state) => {
-            return state;
-          },
-          Err(err) => {
-            log::error!("REDIS SERVICE ERROR: {}", err);
-            return None;
-          }
-      }
+    pub async fn revoke_token(&self, token: String) -> Result<(), GoogleServiceError> {
+        // TODO: implement Google API token revoketion
+        Ok(())
     }
 }
 
-async fn get_google_oauth2_sert(url: &str) -> Result<DecodingKey, String> {
-  // let headers = HeaderMap::new();
-  // let response = request::get(url, headers).await?.json::<serde_json::Value>()?;
-  let client = Client::new();
-  let mut jwks_response = match client.get(url).send().await {
-    Ok(jwks_response_try) => jwks_response_try,
-    Err(err) => return Err(err.to_string()),
-  };
-  let jwks = match jwks_response.json::<serde_json::Value>().await {
-    Ok(jwk_try) => jwk_try,
-    Err(err) => return Err(err.to_string()),
-  };
-  let key = jwks["keys"][0].clone();
-  println!("key {:?}, url: {}", key, url);
-  // Create a decoding key from the selected key
-  return match DecodingKey::from_rsa_components(
-    &key["n"].as_str().unwrap(),
-    &key["e"].as_str().unwrap(),
-  ) {
-    Ok(decoding_key) => Ok(decoding_key),
-    Err(err) => Err(err.to_string()),
-  };
+pub fn decode_token(
+    token: &str,
+    key: &DecodingKey,
+    check_expiration: bool,
+) -> Result<TokenClaims, GoogleServiceError> {
+    // Validation configuration
+    let mut validation = Validation::new(Algorithm::RS256);
+    if !check_expiration {
+        validation.validate_exp = false;
+    }
+
+    let token_data: TokenData<TokenClaims> = match decode(token, key, &validation) {
+        Ok(data) => data,
+        Err(err) => {
+            log::error!("Decode Error: {}\n token: {}\n", err, token);
+            return Err(GoogleServiceError::JWTDecodingError);
+        }
+    };
+
+    Ok(token_data.claims)
+}
+
+async fn get_google_oauth2_keys(
+    cert_url: &str,
+) -> Result<HashMap<String, DecodingKey>, GoogleServiceError> {
+    let jwks_response = async_http_client(HttpRequest {
+        method: Method::GET,
+        url: Url::parse(cert_url).expect("parse url error"),
+        headers: HeaderMap::new(),
+        body: vec![],
+    })
+    .await
+    .expect("request Error");
+
+    let jwt_keys = serde_json::from_slice::<GoogleKeys>(&jwks_response.body)?;
+    let mut keys = HashMap::new();
+    jwt_keys.keys.into_iter().for_each(|cert| {
+        let key = DecodingKey::from_rsa_components(&cert.n, &cert.e);
+        match key {
+            Ok(k) => {
+                keys.insert(cert.kid, k);
+                return ();
+            }
+            Err(err) => log::error!(
+                "Error to create Decoding key for cert: {:?}, error: {}",
+                cert,
+                err
+            ),
+        };
+    });
+    Ok(keys)
 }
