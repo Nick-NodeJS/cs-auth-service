@@ -2,10 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use super::{
     app_error::AppError,
-    services::{
-        cache::service::CacheService, google::service::GoogleService,
-        storage::service::StorageService, user::service::UserService,
-    },
+    services::{google::service::GoogleService, user::service::UserService},
 };
 
 #[derive(Clone)]
@@ -17,17 +14,10 @@ pub struct AppData {
 impl AppData {
     pub async fn new() -> Result<AppData, AppError> {
         // Set AppData to share services, configs etc
+        let mut google_service = GoogleService::new().await?;
+        google_service.init().await?;
 
-        let cache_service = match CacheService::new() {
-            Ok(service) => service,
-            Err(err) => panic!("{:?}", err),
-        };
-
-        let storage_service = StorageService::new().await?;
-
-        let google_service = GoogleService::new(cache_service.clone()).await?;
-
-        let user_service = UserService::new(cache_service, storage_service);
+        let user_service = UserService::new().await?;
 
         let app_data = AppData {
             google_service: Arc::new(Mutex::new(google_service)),

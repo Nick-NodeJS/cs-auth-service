@@ -6,10 +6,12 @@ use oauth2::RequestTokenError;
 use redis::RedisError;
 use thiserror::Error;
 
+use crate::app::services::cache::error::CacheServiceError;
+
 #[derive(Debug, Error)]
 pub enum GoogleServiceError {
-    #[error("Redis error")]
-    RedisError,
+    #[error("CacheService error")]
+    CacheServiceError,
 
     #[error("JWT decoding error")]
     JWTDecodingError,
@@ -52,12 +54,21 @@ pub enum GoogleServiceError {
 
     #[error("Base64 decode error")]
     Base64DecodeError,
+
+    #[error("OAuth2 certificates response has no expires header")]
+    OAuth2CertificatesResponse,
+
+    #[error("HeaderToStr error")]
+    HeaderToStrError,
+
+    #[error("chrono::Parse error")]
+    ChronoParseError,
 }
 
-impl From<RedisError> for GoogleServiceError {
-    fn from(err: RedisError) -> Self {
-        log::debug!("Redis error: {:?}", err);
-        return GoogleServiceError::RedisError;
+impl From<CacheServiceError> for GoogleServiceError {
+    fn from(err: CacheServiceError) -> Self {
+        log::debug!("CacheService error: {:?}", err);
+        return GoogleServiceError::CacheServiceError;
     }
 }
 
@@ -125,5 +136,19 @@ impl From<base64::DecodeError> for GoogleServiceError {
     fn from(err: base64::DecodeError) -> Self {
         log::debug!("base64::DecodeError: {}", err);
         return GoogleServiceError::Base64DecodeError;
+    }
+}
+
+impl From<actix_web::http::header::ToStrError> for GoogleServiceError {
+    fn from(err: actix_web::http::header::ToStrError) -> Self {
+        log::debug!("actix_web::http::header::ToStrError: {}", err);
+        return GoogleServiceError::HeaderToStrError;
+    }
+}
+
+impl From<chrono::ParseError> for GoogleServiceError {
+    fn from(err: chrono::ParseError) -> Self {
+        log::debug!("chrono::ParseError: {}", err);
+        return GoogleServiceError::ChronoParseError;
     }
 }

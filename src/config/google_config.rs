@@ -12,8 +12,9 @@ pub struct GoogleConfig {
     pub google_redirect_url: String,
     pub google_plus_me_url: String,
     pub google_cert_url: String,
-    pub google_redis_state_ttl_sec: u32,
+    pub google_cache_state_ttl_sec: u32,
     pub google_test_token: String,
+    pub google_cache_certs_key: String,
 }
 
 impl GoogleConfig {
@@ -37,17 +38,19 @@ impl GoogleConfig {
             .expect("Missing the GOOGLE_PLUS_ME_URL environment variable.");
         let google_cert_url = dotenv::var("GOOGLE_CERT_URL")
             .expect("Missing the GOOGLE_CERT_URL environment variable.");
-        let google_redis_state_ttl_sec: u32 = dotenv::var("GOOGLE_STATE_REDIS_TTL_SEC")
-            .expect("GOOGLE_STATE_REDIS_TTL_SEC environment variable is not set")
+        let google_cache_certs_key = dotenv::var("GOOGLE_CACHE_CERTS_KEY")
+            .expect("Missing the GOOGLE_CACHE_CERTS_KEY environment variable.");
+        let google_cache_state_ttl_sec: u32 = dotenv::var("GOOGLE_STATE_CACHE_TTL_SEC")
+            .expect("GOOGLE_STATE_CACHE_TTL_SEC environment variable is not set")
             .parse()
-            .expect("Invalid GOOGLE_STATE_REDIS_TTL_MS");
+            .expect("Invalid GOOGLE_STATE_CACHE_TTL_SEC");
         let google_test_token = dotenv::var("GOOGLE_TEST_TOKEN")
             .expect("Missing the GOOGLE_CERT_URL environment variable.");
 
         // Validate TTL in milliseconds to keep Google OAuth2 state in Redis
         // make sense to keep it not more than 3 min
-        if !validate_integer_in_range(google_redis_state_ttl_sec, 1, 3 * 60) {
-            panic!("GOOGLE_STATE_REDIS_TTL_MS out of the range");
+        if !validate_integer_in_range(google_cache_state_ttl_sec, 1, 3 * 60) {
+            panic!("GOOGLE_STATE_CACHE_TTL_SEC out of the range");
         }
 
         Self {
@@ -59,7 +62,8 @@ impl GoogleConfig {
             google_redirect_url,
             google_plus_me_url,
             google_cert_url,
-            google_redis_state_ttl_sec,
+            google_cache_state_ttl_sec,
+            google_cache_certs_key,
             google_test_token,
         }
     }
