@@ -605,6 +605,7 @@ dependencies = [
  "bson",
  "chrono",
  "cs_shared_lib",
+ "derivative",
  "dotenv",
  "env_logger",
  "jsonwebtoken",

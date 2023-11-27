@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use crate::config::redis_config::RedisConfig;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CacheService {
     client: Client,
 }

@@ -28,3 +28,4 @@ base64 = "0.21.5"
 mongodb = "2.7.1"
 chrono = "0.4.31"
 bson = { version = "2.7.0", features = ["chrono-0_4"] }
+derivative = "2.2.0"

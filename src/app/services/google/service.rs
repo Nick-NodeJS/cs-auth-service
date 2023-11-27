@@ -1,4 +1,6 @@
+use derivative::Derivative;
 use std::collections::HashMap;
+use std::fmt::{self, Display};
 use std::str::FromStr;
 
 use actix_web::http::Method;
@@ -22,13 +24,16 @@ use crate::app::services::cache::service::CacheService;
 use crate::config::google_config::GoogleConfig;
 
 use super::error::GoogleServiceError;
-use super::structures::{GoogleKeys, GoogleTokens, TokenClaims, TokenHeaderObject};
+use super::structures::{GoogleCert, GoogleKeys, GoogleTokens, TokenClaims, TokenHeaderObject};
 
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct GoogleService {
     oauth2_client: BasicClient,
     cache_service: CacheService,
     config: GoogleConfig,
-    google_oauth2_decoding_keys: HashMap<String, DecodingKey>,
+    #[derivative(Debug = "ignore")]
+    google_oauth2_decoding_keys: HashMap<String, (GoogleCert, DecodingKey)>,
 }
 
 impl GoogleService {
@@ -92,8 +97,6 @@ impl GoogleService {
         csrf_state: &str,
         pkce_code_verifier: &str,
     ) -> Result<(), GoogleServiceError> {
-        // get redis service and set auth data in cache
-        // let mut cache_service = app_data.cache_service.lock()?;
         self.cache_service.set_value_with_ttl(
             csrf_state,
             &pkce_code_verifier,
@@ -184,9 +187,14 @@ impl GoogleService {
                     base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(header)?;
                 let header_object = serde_json::from_slice::<TokenHeaderObject>(&decoded_slice)?;
                 let try_key = self.google_oauth2_decoding_keys.get(&header_object.kid);
-                if let Some(key) = try_key {
+                if let Some((_, key)) = try_key {
                     return Ok(key);
                 } else {
+                    log::error!(
+                        "No decoding key found for token header kid: {}, Google cert kids: {:?}",
+                        header_object.kid,
+                        self.google_oauth2_decoding_keys.keys()
+                    );
                     return Err(GoogleServiceError::BadTokenStructure);
                 }
             }
@@ -267,7 +275,7 @@ pub fn decode_token(
 
 async fn get_google_oauth2_keys(
     cert_url: &str,
-) -> Result<HashMap<String, DecodingKey>, GoogleServiceError> {
+) -> Result<HashMap<String, (GoogleCert, DecodingKey)>, GoogleServiceError> {
     let jwks_response = async_http_client(HttpRequest {
         method: Method::GET,
         url: Url::parse(cert_url).expect("parse url error"),
@@ -278,12 +286,12 @@ async fn get_google_oauth2_keys(
     .expect("request Error");
 
     let jwt_keys = serde_json::from_slice::<GoogleKeys>(&jwks_response.body)?;
-    let mut keys = HashMap::new();
+    let mut keys: HashMap<String, (GoogleCert, DecodingKey)> = HashMap::new();
     jwt_keys.keys.into_iter().for_each(|cert| {
         let key = DecodingKey::from_rsa_components(&cert.n, &cert.e);
         match key {
             Ok(k) => {
-                keys.insert(cert.kid, k);
+                keys.insert(cert.kid.clone(), (cert, k));
                 return ();
             }
             Err(err) => log::error!(
@@ -294,4 +302,27 @@ async fn get_google_oauth2_keys(
         };
     });
     Ok(keys)
+}
+
+impl Display for GoogleService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "GoogleService {{ ")?;
+
+        // Display other fields
+        write!(f, "oauth2_client: {:?}, ", self.oauth2_client)?;
+        write!(f, "cache_service: {:?}, ", self.cache_service)?;
+        write!(f, "config: {:?}, ", self.config)?;
+
+        // Display only the keys of google_oauth2_decoding_keys
+        write!(
+            f,
+            "google_oauth2_decoding_keys(certificates): {:?}",
+            self.google_oauth2_decoding_keys
+                .iter()
+                .map(|(_, (cert, _))| cert.to_owned())
+                .collect::<Vec<GoogleCert>>()
+        )?;
+
+        write!(f, " }}")
+    }
 }

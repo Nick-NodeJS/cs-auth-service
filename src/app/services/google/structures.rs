@@ -1,3 +1,6 @@
+use std::fmt;
+
+use jsonwebtoken::DecodingKey;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -10,7 +13,7 @@ pub struct GoogleKeys {
     pub keys: Vec<GoogleCert>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct GoogleCert {
     pub kid: String,
     pub alg: String,
