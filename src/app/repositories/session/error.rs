@@ -1,19 +1,20 @@
-use redis::RedisError;
 use thiserror::Error;
+
+use crate::app::services::cache::error::CacheServiceError;
 
 #[derive(Debug, Error)]
 pub enum SessionRepositoryError {
-    #[error("Redis error")]
-    RedisError,
+    #[error("CacheService error")]
+    CacheServiceError,
 
     #[error("SerdeJson error")]
     SerdeJsonError,
 }
 
-impl From<RedisError> for SessionRepositoryError {
-    fn from(err: RedisError) -> Self {
-        log::debug!("Redis error: {:?}", err);
-        return SessionRepositoryError::RedisError;
+impl From<CacheServiceError> for SessionRepositoryError {
+    fn from(err: CacheServiceError) -> Self {
+        log::debug!("CacheService error: {:?}", err);
+        return SessionRepositoryError::CacheServiceError;
     }
 }
 

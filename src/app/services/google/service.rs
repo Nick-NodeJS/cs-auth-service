@@ -1,3 +1,5 @@
+use bson::oid::ObjectId;
+use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
@@ -20,7 +22,7 @@ use oauth2::{
 };
 
 use crate::app::models::user::GoogleProfile;
-use crate::app::services::cache::service::CacheService;
+use crate::app::services::cache::service::{CacheService, CacheServiceType};
 use crate::config::google_config::GoogleConfig;
 
 use super::error::GoogleServiceError;
@@ -32,12 +34,13 @@ pub struct GoogleService {
     oauth2_client: BasicClient,
     cache_service: CacheService,
     config: GoogleConfig,
-    #[derivative(Debug = "ignore")]
-    google_oauth2_decoding_keys: HashMap<String, (GoogleCert, DecodingKey)>,
+    // #[derivative(Debug = "ignore")]
+    // google_oauth2_decoding_keys: HashMap<String, (GoogleCert, DecodingKey)>,
 }
 
 impl GoogleService {
-    pub async fn new(cache_service: CacheService) -> Result<Self, GoogleServiceError> {
+    pub async fn new() -> Result<Self, GoogleServiceError> {
+        let cache_service = CacheService::new(CacheServiceType::Google)?;
         let config = GoogleConfig::new();
         let google_client_id = ClientId::new(config.google_client_id.to_string());
         let google_client_secret = ClientSecret::new(config.google_client_secret.to_string());
@@ -61,14 +64,21 @@ impl GoogleService {
             RevocationUrl::new(config.google_revoke_url.to_string())
                 .expect("Invalid revocation endpoint URL"),
         );
-        let google_oauth2_decoding_keys = get_google_oauth2_keys(&config.google_cert_url).await?;
 
         Ok(GoogleService {
             oauth2_client: client,
             cache_service,
             config,
-            google_oauth2_decoding_keys,
         })
+    }
+
+    pub async fn init(&mut self) -> Result<(), GoogleServiceError> {
+        let (google_certs, expires) =
+            get_google_oauth2_certificates(&self.config.google_cert_url).await?;
+
+        self.set_certificates_to_cache(google_certs, expires)
+            .await?;
+        Ok(())
     }
 
     pub fn get_authorization_url_data(&self) -> (Url, CsrfToken, String) {
@@ -100,7 +110,7 @@ impl GoogleService {
         self.cache_service.set_value_with_ttl(
             csrf_state,
             &pkce_code_verifier,
-            self.config.google_redis_state_ttl_sec as usize,
+            self.config.google_cache_state_ttl_sec as usize,
         )?;
         Ok(())
     }
@@ -177,34 +187,64 @@ impl GoogleService {
         Ok(result)
     }
 
-    pub fn get_token_key(&self, token: &str) -> Result<&DecodingKey, GoogleServiceError> {
+    /*
+    TODO: reimplement certificates logic.
+    - they should be received in initial step and stored in cache with expiration which is in header response
+    - in case no certificates in cache update them by getting again request to GAPI
+    - in case fail on this step or in case the token is wrong, try to use GAPI /v3/token endpoint to get user profile
+     */
+    pub async fn get_token_key(
+        &mut self,
+        token: &str,
+    ) -> Result<Option<DecodingKey>, GoogleServiceError> {
         let token_string = token.to_string();
         let token_parts: Vec<&str> = token_string.split('.').collect();
-        let try_header = token_parts.into_iter().next();
-        match try_header {
-            Some(header) => {
-                let decoded_slice =
-                    base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(header)?;
-                let header_object = serde_json::from_slice::<TokenHeaderObject>(&decoded_slice)?;
-                let try_key = self.google_oauth2_decoding_keys.get(&header_object.kid);
-                if let Some((_, key)) = try_key {
-                    return Ok(key);
-                } else {
-                    log::error!(
-                        "No decoding key found for token header kid: {}, Google cert kids: {:?}",
-                        header_object.kid,
-                        self.google_oauth2_decoding_keys.keys()
-                    );
-                    return Err(GoogleServiceError::BadTokenStructure);
-                }
+        let header = match token_parts.into_iter().next() {
+            Some(header) => header,
+            None => {
+                log::warn!("Bad token, no header found. Token: {}", token_string);
+                return Err(GoogleServiceError::BadTokenStructure);
             }
-            None => Err(GoogleServiceError::BadTokenStructure),
-        }
+        };
+        let decoded_slice = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(header)?;
+        let header_object = serde_json::from_slice::<TokenHeaderObject>(&decoded_slice)?;
+        let decoding_key = match self.get_certificates_from_cache().await? {
+            Some(certs) => get_decoding_key_from_vec_cert(certs, header_object.kid.clone())?,
+            None => {
+                log::debug!("No certificates found in cache. Trying to refresh them on GAPI...");
+                let (google_certs, expires) =
+                    get_google_oauth2_certificates(&self.config.google_cert_url).await?;
+
+                self.set_certificates_to_cache(google_certs.clone(), expires)
+                    .await?;
+                get_decoding_key_from_vec_cert(google_certs, header_object.kid)?
+            }
+        };
+        Ok(decoding_key)
     }
 
-    pub async fn get_user_profile(&self, token: &str) -> Result<GoogleProfile, GoogleServiceError> {
-        let key = self.get_token_key(token)?;
-        let token_data = decode_token(token, key, true)?;
+    pub async fn get_user_profile(
+        &mut self,
+        token: &str,
+    ) -> Result<GoogleProfile, GoogleServiceError> {
+        let key = match self.get_token_key(token.clone()).await? {
+            Some(decoding_key) => decoding_key,
+            None => {
+                log::warn!(
+                    "No decoding key for token: {}\n Trying to get user profile on GAPI...",
+                    token
+                );
+                // TODO: implement http request to https://oauth2.googleapis.com/token to get user profile
+                return Ok(GoogleProfile {
+                    user_id: "fake_google_id".to_string(),
+                    name: "fake_name".to_string(),
+                    email: "fake_email".to_string(),
+                    email_verified: false,
+                    picture: "fake_picture".to_string(),
+                });
+            }
+        };
+        let token_data = decode_token(token, &key, true)?;
         log::debug!("\nToken data: {:?}\n", token_data);
 
         Ok(GoogleProfile {
@@ -249,6 +289,36 @@ impl GoogleService {
         // TODO: implement Google API token revoketion
         Ok(())
     }
+
+    async fn set_certificates_to_cache(
+        &mut self,
+        certificates: Vec<GoogleCert>,
+        expires: DateTime<Utc>,
+    ) -> Result<(), GoogleServiceError> {
+        let now = Utc::now();
+        let expired_duration = expires.signed_duration_since(now).num_seconds();
+        self.cache_service.set_value_with_ttl(
+            &self.config.google_cache_certs_key,
+            &serde_json::to_string(&certificates)?,
+            expired_duration as usize,
+        )?;
+        Ok(())
+    }
+
+    async fn get_certificates_from_cache(
+        &mut self,
+    ) -> Result<Option<Vec<GoogleCert>>, GoogleServiceError> {
+        let try_certs = self
+            .cache_service
+            .get_value(&self.config.google_cache_certs_key)?;
+        match try_certs {
+            Some(certs_string) => {
+                let certs = serde_json::from_str::<Vec<GoogleCert>>(&certs_string)?;
+                Ok(Some(certs))
+            }
+            None => Ok(None),
+        }
+    }
 }
 
 pub fn decode_token(
@@ -273,9 +343,9 @@ pub fn decode_token(
     Ok(token_data.claims)
 }
 
-async fn get_google_oauth2_keys(
+async fn get_google_oauth2_certificates(
     cert_url: &str,
-) -> Result<HashMap<String, (GoogleCert, DecodingKey)>, GoogleServiceError> {
+) -> Result<(Vec<GoogleCert>, DateTime<Utc>), GoogleServiceError> {
     let jwks_response = async_http_client(HttpRequest {
         method: Method::GET,
         url: Url::parse(cert_url).expect("parse url error"),
@@ -285,44 +355,45 @@ async fn get_google_oauth2_keys(
     .await
     .expect("request Error");
 
+    let cert_expires = match jwks_response.headers.get("expires") {
+        Some(value) => value.to_str()?,
+        None => return Err(GoogleServiceError::OAuth2CertificatesResponse),
+    };
+    let cert_expires_datetime: DateTime<Utc> = DateTime::parse_from_rfc2822(cert_expires)?.into();
+
     let jwt_keys = serde_json::from_slice::<GoogleKeys>(&jwks_response.body)?;
-    let mut keys: HashMap<String, (GoogleCert, DecodingKey)> = HashMap::new();
-    jwt_keys.keys.into_iter().for_each(|cert| {
-        let key = DecodingKey::from_rsa_components(&cert.n, &cert.e);
-        match key {
-            Ok(k) => {
-                keys.insert(cert.kid.clone(), (cert, k));
-                return ();
-            }
-            Err(err) => log::error!(
-                "Error to create Decoding key for cert: {:?}, error: {}",
-                cert,
-                err
-            ),
-        };
-    });
-    Ok(keys)
+    // let mut keys: HashMap<String, GoogleCert> = HashMap::new();
+    // jwt_keys.keys.into_iter().for_each(|cert| {
+    //     let key = DecodingKey::from_rsa_components(&cert.n, &cert.e);
+    //     match key {
+    //         Ok(k) => {
+    //             keys.insert(cert.kid.clone(), (cert, k));
+    //             return ();
+    //         }
+    //         Err(err) => log::error!(
+    //             "Error to create Decoding key for cert: {:?}, error: {}",
+    //             cert,
+    //             err
+    //         ),
+    //     };
+    // });
+    Ok((jwt_keys.keys, cert_expires_datetime))
 }
 
-impl Display for GoogleService {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "GoogleService {{ ")?;
-
-        // Display other fields
-        write!(f, "oauth2_client: {:?}, ", self.oauth2_client)?;
-        write!(f, "cache_service: {:?}, ", self.cache_service)?;
-        write!(f, "config: {:?}, ", self.config)?;
-
-        // Display only the keys of google_oauth2_decoding_keys
-        write!(
-            f,
-            "google_oauth2_decoding_keys(certificates): {:?}",
-            self.google_oauth2_decoding_keys
-                .iter()
-                .map(|(_, (cert, _))| cert.to_owned())
-                .collect::<Vec<GoogleCert>>()
-        )?;
-
-        write!(f, " }}")
+pub fn get_decoding_key_from_vec_cert(
+    certs: Vec<GoogleCert>,
+    kid: String,
+) -> Result<Option<DecodingKey>, GoogleServiceError> {
+    let cert = certs.clone().into_iter().find(|c| c.kid == kid);
+    if let Some(certificate) = cert {
+        let key = DecodingKey::from_rsa_components(&certificate.n, &certificate.e)?;
+        Ok(Some(key.clone()))
+    } else {
+        log::error!(
+            "No certificate found in cache for kid: {}. Certificates: {:?}",
+            kid,
+            &certs
+        );
+        Ok(None)
     }
 }

@@ -8,25 +8,38 @@ use serde_json::Value;
 
 use crate::config::redis_config::RedisConfig;
 
+use super::error::CacheServiceError;
+
+#[derive(Debug)]
+pub enum CacheServiceType {
+    Google,
+    Session,
+    User,
+}
 #[derive(Clone, Debug)]
 pub struct CacheService {
     client: Client,
 }
 
 impl CacheService {
-    pub fn new() -> Result<Self> {
+    pub fn new(service_type: CacheServiceType) -> Result<Self, CacheServiceError> {
         let redis_config = RedisConfig::new();
-        let client = Client::open(redis_config.get_redis_url())?;
+        let database = match service_type {
+            CacheServiceType::Session => redis_config.session_database,
+            CacheServiceType::Google => redis_config.google_database,
+            CacheServiceType::User => redis_config.user_database,
+        };
+        let client = Client::open(redis_config.get_redis_url(database))?;
         Ok(CacheService { client })
     }
 
-    pub fn hmset(&mut self, key: &str, items: &[(&str, String)]) -> Result<(), RedisError> {
+    pub fn hmset(&mut self, key: &str, items: &[(&str, String)]) -> Result<(), CacheServiceError> {
         let mut connection = self.get_connection()?;
         connection.hset_multiple(key, items)?;
         Ok(())
     }
 
-    pub fn hmget(&mut self, key: &str) -> Result<HashMap<String, String>, RedisError> {
+    pub fn hmget(&mut self, key: &str) -> Result<HashMap<String, String>, CacheServiceError> {
         let mut connection = self.get_connection()?;
         let result: HashMap<String, String> = connection.hgetall(key)?;
         Ok(result)
@@ -37,19 +50,19 @@ impl CacheService {
         key: &str,
         value: &str,
         seconds: usize,
-    ) -> Result<(), RedisError> {
+    ) -> Result<(), CacheServiceError> {
         let mut connection = self.get_connection()?;
         connection.set_ex(key, value, seconds)?;
         Ok(())
     }
 
-    pub fn get_value(&mut self, key: &str) -> Result<Option<String>, RedisError> {
+    pub fn get_value(&mut self, key: &str) -> Result<Option<String>, CacheServiceError> {
         let mut connection = self.get_connection()?;
         let value: Option<String> = connection.get(key)?;
         Ok(value)
     }
 
-    fn get_connection(&self) -> Result<Connection, RedisError> {
+    fn get_connection(&self) -> Result<Connection, CacheServiceError> {
         let connection = self.client.get_connection()?;
         Ok(connection)
     }

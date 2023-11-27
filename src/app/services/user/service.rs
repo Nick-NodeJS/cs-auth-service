@@ -8,7 +8,8 @@ use crate::app::{
     },
     repositories::{session::repository::SessionRepository, user::repository::UserRepository},
     services::{
-        cache::service::CacheService, session::service::SessionService,
+        cache::service::{CacheService, CacheServiceType},
+        session::service::SessionService,
         storage::service::StorageService,
     },
 };
@@ -21,17 +22,20 @@ pub struct UserService {
 }
 
 impl UserService {
-    pub fn new(cache_service: CacheService, storage_service: StorageService) -> Self {
+    pub async fn new() -> Result<Self, UserServiceError> {
+        let storage_service = StorageService::new().await?;
+        let user_cache_service = CacheService::new(CacheServiceType::User)?;
         let user_repository = UserRepository::new(
             storage_service.config.user_collection.clone(),
-            cache_service.clone(),
+            user_cache_service,
             storage_service,
         );
-        let session_service = SessionService::new(SessionRepository::new(cache_service));
-        UserService {
+        let session_cache_service = CacheService::new(CacheServiceType::Session)?;
+        let session_service = SessionService::new(SessionRepository::new(session_cache_service));
+        Ok(UserService {
             session_service,
             user_repository,
-        }
+        })
     }
 
     // TODO:

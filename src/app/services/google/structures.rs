@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Display};
 
 use jsonwebtoken::DecodingKey;
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,7 @@ pub struct TokenHeaderObject {
     pub kid: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct GoogleKeys {
     pub keys: Vec<GoogleCert>,
 }
@@ -19,6 +19,17 @@ pub struct GoogleCert {
     pub alg: String,
     pub n: String,
     pub e: String,
+}
+
+struct DisplayGoogleCerts<'a>(&'a Vec<GoogleCert>);
+
+impl<'a> fmt::Display for DisplayGoogleCerts<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for cert in self.0.iter() {
+            writeln!(f, "\n{:?}", cert)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
