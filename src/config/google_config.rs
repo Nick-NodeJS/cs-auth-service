@@ -2,7 +2,7 @@ use cs_shared_lib::validation::validate_integer_in_range;
 use dotenv::dotenv;
 use serde::Deserialize;
 
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct GoogleConfig {
     pub google_client_id: String,
     pub google_client_secret: String,

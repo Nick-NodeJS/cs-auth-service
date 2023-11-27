@@ -12,7 +12,7 @@ pub async fn auth_callback(
     app_data: web::Data<AppData>,
 ) -> Result<HttpResponse, AppError> {
     let mut google_service = app_data.google_service.lock()?;
-    let user_service = app_data.user_service.lock()?;
+    let mut user_service = app_data.user_service.lock()?;
     let (code, state) = google_service.parse_auth_query_string(req.query_string())?;
 
     // process code and state to get tokens
@@ -24,7 +24,7 @@ pub async fn auth_callback(
     // TODO: during adding a new or updating an existen user it should set session data(refresh token, login timestamp etc)
     if let Some(refresh_token) = tokens.refresh_token {
         user_service
-            .set_user_and_session(UserProfile::Google(user_profile), refresh_token.clone())
+            .create_user_and_session(UserProfile::Google(user_profile), refresh_token.clone())
             .await?;
         return Ok(HttpResponse::Ok().json(tokens_as_json((tokens.access_token, refresh_token))));
     } else {
@@ -33,18 +33,16 @@ pub async fn auth_callback(
             user_profile.user_id
         );
         // TODO: get user session on this step and use it in set_user_and_session
-        if let Some(existen_refresh_token) = user_service
+        if let Some(user_session) = user_service
             .check_if_user_logged_in_with_profile(UserProfile::Google(user_profile.clone()))
             .await?
         {
             user_service
-                .set_user_and_session(
-                    UserProfile::Google(user_profile),
-                    existen_refresh_token.clone(),
-                )
+                .update_user_and_session(UserProfile::Google(user_profile), user_session.clone())
                 .await?;
-            return Ok(HttpResponse::Ok()
-                .json(tokens_as_json((tokens.access_token, existen_refresh_token))));
+            return Ok(
+                HttpResponse::Ok().json(tokens_as_json((tokens.access_token, user_session.token)))
+            );
         } else {
             log::warn!(
                 "\nGoogle user id: {} has no refresh token. Should relogin\n",

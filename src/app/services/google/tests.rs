@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use env_logger::Env;
     use jsonwebtoken::DecodingKey;
 
     use crate::{
@@ -14,6 +15,9 @@ mod tests {
        Do not forget update Google Service to decode token properly
     */
     fn test_google_token_decoding() {
+        // Set logger for all tests
+        env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+
         let google_config = GoogleConfig::new();
         let token: &str = &google_config.google_test_token;
 

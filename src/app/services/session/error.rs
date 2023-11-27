@@ -1,15 +1,16 @@
-use redis::RedisError;
 use thiserror::Error;
+
+use crate::app::repositories::session::error::SessionRepositoryError;
 
 #[derive(Debug, Error)]
 pub enum SessionServiceError {
-    #[error("Redis error")]
-    RedisError,
+    #[error("SessionRepository error")]
+    SessionRepositoryError,
 }
 
-impl From<RedisError> for SessionServiceError {
-    fn from(err: RedisError) -> Self {
-        log::debug!("Redis error: {:?}", err);
-        return SessionServiceError::RedisError;
+impl From<SessionRepositoryError> for SessionServiceError {
+    fn from(err: SessionRepositoryError) -> Self {
+        log::debug!("SessionRepositoryError: {:?}", err);
+        return SessionServiceError::SessionRepositoryError;
     }
 }
