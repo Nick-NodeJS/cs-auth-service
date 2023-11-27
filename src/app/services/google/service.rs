@@ -265,7 +265,7 @@ pub fn decode_token(
     let token_data: TokenData<TokenClaims> = match decode(token, key, &validation) {
         Ok(data) => data,
         Err(err) => {
-            log::error!("Decode Error: {}\n token: {}\n", err, token);
+            log::warn!("Decode Error: {}\n token: {}\n", err, token);
             return Err(GoogleServiceError::JWTDecodingError);
         }
     };
