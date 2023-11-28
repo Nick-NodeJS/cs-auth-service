@@ -1,8 +1,28 @@
 version: '3'
+
 services:
-  cs-auth-service:
-    build: .
-    env_file:
-      - .env
+
+  redis:
+    image: redis:latest
+    container_name: cs-redis
     ports:
-      - "8080:8080"
+      - "6379:6379"
+  mongodb:
+    image: mongo:latest
+    container_name: cs-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME:-csuser}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-cspassword}
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data:/data/db
+
+  # cs-auth-service:
+  #   build: .
+  #   env_file:
+  #     - .env
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     - redis

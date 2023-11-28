@@ -1,3 +1,5 @@
 /target
+/cs_shared_lib/target
 .env*
 .vscode
+data

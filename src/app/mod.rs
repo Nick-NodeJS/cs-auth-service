@@ -1,50 +1,61 @@
+mod app_data;
+mod app_error;
 mod handlers;
+mod models;
+mod repositories;
+mod services;
 
-use actix_web::{web, App, HttpResponse, HttpServer};
+use actix_web::{middleware::Logger, web, App, HttpServer};
 
-use log::info;
+use crate::app::app_data::AppData;
+use crate::config::app_config::AppConfig;
 use env_logger::Env;
-use crate::config::{
-    app_config::AppConfig,
-    google_config::GoogleConfig,
-};
+use log::info;
 
 use crate::app::handlers::google::{
-    auth_callback::auth_callback as google_auth_callback,
-    login::login as login_with_google,
+    auth_callback::auth_callback as google_auth_callback, login::login as login_with_google,
 };
 
-async fn hello() -> HttpResponse {
-    println!("get one!");
-    HttpResponse::Ok().body("Hello from cs-auth-service!\n")
-}
-
+use crate::app::handlers::health_check::status;
 
 /**
  * TODO:
- * 1. finish redirect flow
- * 2. implement auth flow with multi providers
- * 3. tests
- * 4. docs
+ * 1. add tests
+ * 2. add docs
  */
 
 pub async fn run() -> std::io::Result<()> {
     // Initialize the logger
-    env_logger::Builder::from_env(Env::default().filter_or("RUST_LOG", "info")).init();
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
     let app_config = AppConfig::new();
-    let google_config = GoogleConfig::new();
 
     info!("Service address {}", app_config.server_address_with_port());
 
     let server_address_with_port = app_config.server_address_with_port();
 
+    let app_data = match AppData::new().await {
+        Ok(data) => data,
+        Err(err) => panic!("Error to create AppData: {:?}", err),
+    };
+
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(google_config.clone()))
-            .route("/", web::get().to(hello))
-            .route("/login/google", web::get().to(login_with_google))
-            .route("/callback/google/auth", web::get().to(google_auth_callback))
+            .wrap(Logger::default())
+            .app_data(web::Data::new(app_data.clone()))
+            .service(
+                web::scope(format!("/api/{}", app_config.api_version).as_ref())
+                    .service(
+                        web::scope("/auth")
+                            .route("/google", web::get().to(login_with_google))
+                            .route("/google/callback", web::get().to(google_auth_callback)),
+                    )
+                    .route("/status", web::get().to(status)), // .service(
+                                                              //     web::scope("/users")
+                                                              //     .wrap(authentication_middleware)
+                                                              //     .route("/me", web::get().to(user_profile))
+                                                              // )
+            )
     })
     .bind(server_address_with_port)?
     .run()
