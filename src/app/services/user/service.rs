@@ -63,9 +63,13 @@ impl UserService {
         &self,
         user_profile: UserProfile,
     ) -> Result<User, UserServiceError> {
-        let new_user = User::new(user_profile);
-        self.user_repository.insert_user(new_user.clone()).await?;
-        Ok(new_user)
+        if let Some(user) = self.get_user_by_profile(user_profile.clone()).await? {
+            Ok(self.update_user_with_profile(user.id, user_profile).await?)
+        } else {
+            let new_user = User::new(user_profile);
+            self.user_repository.insert_user(new_user.clone()).await?;
+            Ok(new_user)
+        }
     }
 
     pub async fn update_user_with_profile(

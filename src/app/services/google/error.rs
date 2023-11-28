@@ -1,5 +1,6 @@
 use std::string::FromUtf8Error;
 
+use actix_web::http::header::InvalidHeaderValue;
 use awc::error::{JsonPayloadError, SendRequestError};
 use jsonwebtoken::errors::Error as JWTError;
 use oauth2::RequestTokenError;
@@ -28,8 +29,8 @@ pub enum GoogleServiceError {
     #[error("No callback state in cache")]
     CallbackStateCacheError,
 
-    #[error("No refresh token in response")]
-    NoRefreshTokenResponseError,
+    #[error("Token data response error")]
+    TokenDataResponseError,
 
     #[error("OAuth2 request token error")]
     OAuth2RequestTokenError,
@@ -58,11 +59,17 @@ pub enum GoogleServiceError {
     #[error("OAuth2 certificates response has no expires header")]
     OAuth2CertificatesResponse,
 
+    #[error("Revoke request error")]
+    RevokeRequestError,
+
     #[error("HeaderToStr error")]
     HeaderToStrError,
 
     #[error("chrono::Parse error")]
     ChronoParseError,
+
+    #[error("InvalidHeaderValue error")]
+    InvalidHeaderValue,
 }
 
 impl From<CacheServiceError> for GoogleServiceError {
@@ -150,5 +157,12 @@ impl From<chrono::ParseError> for GoogleServiceError {
     fn from(err: chrono::ParseError) -> Self {
         log::debug!("chrono::ParseError: {}", err);
         return GoogleServiceError::ChronoParseError;
+    }
+}
+
+impl From<InvalidHeaderValue> for GoogleServiceError {
+    fn from(err: InvalidHeaderValue) -> Self {
+        log::debug!("InvalidHeaderValue: {}", err);
+        return GoogleServiceError::InvalidHeaderValue;
     }
 }

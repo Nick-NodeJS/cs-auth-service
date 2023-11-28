@@ -1,3 +1,5 @@
+use awc::error::HeaderValue;
+use oauth2::http::HeaderMap;
 use serde_json::{Map, Value};
 
 /// return tokens as json object
@@ -41,4 +43,13 @@ pub fn error_as_json(error: String) -> Map<String, Value> {
     let mut payload = Map::new();
     payload.insert("error".to_string(), Value::String(error));
     return payload;
+}
+
+pub fn get_x_www_form_headers() -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "Content-Type",
+        HeaderValue::from_static("application/x-www-form-urlencoded"),
+    );
+    headers
 }

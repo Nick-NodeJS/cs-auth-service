@@ -56,3 +56,15 @@ pub struct TokenClaims {
     pub iat: u32,
     pub exp: u32,
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UserInfo {
+    pub sub: String,
+    pub email: String,
+    pub email_verified: bool,
+    pub name: String,
+    pub picture: String,
+    pub given_name: String,
+    pub family_name: String,
+    pub locale: String,
+}
