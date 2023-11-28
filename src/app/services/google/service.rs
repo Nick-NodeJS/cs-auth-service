@@ -23,10 +23,13 @@ use oauth2::{
 
 use crate::app::models::user::GoogleProfile;
 use crate::app::services::cache::service::{CacheService, CacheServiceType};
+use crate::app::services::common::get_x_www_form_headers;
 use crate::config::google_config::GoogleConfig;
 
 use super::error::GoogleServiceError;
-use super::structures::{GoogleCert, GoogleKeys, GoogleTokens, TokenClaims, TokenHeaderObject};
+use super::structures::{
+    GoogleCert, GoogleKeys, GoogleTokens, TokenClaims, TokenHeaderObject, UserInfo,
+};
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -143,11 +146,6 @@ impl GoogleService {
         // oauth2::BasicClient doesn't have in StandartTokenResponse "id_token"
         // that's why we use common async_http_client
 
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "Content-Type",
-            HeaderValue::from_static("application/x-www-form-urlencoded"),
-        );
         let url = Url::from_str(&self.config.google_token_url)?;
         log::debug!(
             "\ncode: {},\npkce_code_verifier: {}\n",
@@ -165,7 +163,7 @@ impl GoogleService {
         let response = async_http_client(HttpRequest {
             method: Method::POST,
             url,
-            headers,
+            headers: get_x_www_form_headers(),
             body: url::form_urlencoded::Serializer::new(String::new())
                 .extend_pairs(params)
                 .finish()
@@ -235,13 +233,7 @@ impl GoogleService {
                     token
                 );
                 // TODO: implement http request to https://oauth2.googleapis.com/token to get user profile
-                return Ok(GoogleProfile {
-                    user_id: "fake_google_id".to_string(),
-                    name: "fake_name".to_string(),
-                    email: "fake_email".to_string(),
-                    email_verified: false,
-                    picture: "fake_picture".to_string(),
-                });
+                return self.get_user_profile_on_gapi(token).await;
             }
         };
         let token_data = decode_token(token, &key, true)?;
@@ -254,6 +246,39 @@ impl GoogleService {
             email_verified: token_data.email_verified,
             picture: token_data.picture,
         })
+    }
+
+    pub async fn get_user_profile_on_gapi(
+        &self,
+        token: &str,
+    ) -> Result<GoogleProfile, GoogleServiceError> {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "Authorization",
+            HeaderValue::from_str(format!("Bearer {}", token).as_ref())?,
+        );
+        let user_info_response = match async_http_client(HttpRequest {
+            method: Method::GET,
+            url: Url::parse(&self.config.google_userinfo_url).expect("parse url error"),
+            headers,
+            body: vec![],
+        })
+        .await
+        {
+            Ok(response) => response,
+            Err(err) => {
+                log::error!("Google token data request error: {}", err);
+                return Err(GoogleServiceError::TokenDataResponseError);
+            }
+        };
+        let user_info = serde_json::from_slice::<UserInfo>(&user_info_response.body)?;
+        return Ok(GoogleProfile {
+            user_id: user_info.sub,
+            name: user_info.name,
+            email: user_info.email,
+            email_verified: user_info.email_verified,
+            picture: user_info.picture,
+        });
     }
 
     /// get code and state params from query string
@@ -287,6 +312,31 @@ impl GoogleService {
 
     pub async fn revoke_token(&self, token: String) -> Result<(), GoogleServiceError> {
         // TODO: implement Google API token revoketion
+        let mut url = Url::parse(&self.config.google_revoke_url).expect("parse url error");
+        url.set_query(Some(format!("token={}", token).as_ref()));
+        let revoke_response = match async_http_client(HttpRequest {
+            method: Method::POST,
+            url,
+            headers: get_x_www_form_headers(),
+            body: vec![],
+        })
+        .await
+        {
+            Ok(response) => response,
+            Err(err) => {
+                log::error!("Google revoke token request error: {}", err);
+                return Err(GoogleServiceError::RevokeRequestError);
+            }
+        };
+        if !revoke_response.status_code.is_success() {
+            log::error!(
+                "Google revoke token response fail. response status_code: {:?}, body: {:?}",
+                revoke_response.status_code,
+                revoke_response.body
+            );
+            return Err(GoogleServiceError::RevokeRequestError);
+        }
+        log::debug!("Revoked Google token {} successfuly", token);
         Ok(())
     }
 
@@ -346,14 +396,20 @@ pub fn decode_token(
 async fn get_google_oauth2_certificates(
     cert_url: &str,
 ) -> Result<(Vec<GoogleCert>, DateTime<Utc>), GoogleServiceError> {
-    let jwks_response = async_http_client(HttpRequest {
+    let jwks_response = match async_http_client(HttpRequest {
         method: Method::GET,
         url: Url::parse(cert_url).expect("parse url error"),
         headers: HeaderMap::new(),
         body: vec![],
     })
     .await
-    .expect("request Error");
+    {
+        Ok(response) => response,
+        Err(err) => {
+            log::error!("Google certificates request error: {}", err);
+            return Err(GoogleServiceError::OAuth2CertificatesResponse);
+        }
+    };
 
     let cert_expires = match jwks_response.headers.get("expires") {
         Some(value) => value.to_str()?,
@@ -362,21 +418,7 @@ async fn get_google_oauth2_certificates(
     let cert_expires_datetime: DateTime<Utc> = DateTime::parse_from_rfc2822(cert_expires)?.into();
 
     let jwt_keys = serde_json::from_slice::<GoogleKeys>(&jwks_response.body)?;
-    // let mut keys: HashMap<String, GoogleCert> = HashMap::new();
-    // jwt_keys.keys.into_iter().for_each(|cert| {
-    //     let key = DecodingKey::from_rsa_components(&cert.n, &cert.e);
-    //     match key {
-    //         Ok(k) => {
-    //             keys.insert(cert.kid.clone(), (cert, k));
-    //             return ();
-    //         }
-    //         Err(err) => log::error!(
-    //             "Error to create Decoding key for cert: {:?}, error: {}",
-    //             cert,
-    //             err
-    //         ),
-    //     };
-    // });
+
     Ok((jwt_keys.keys, cert_expires_datetime))
 }
 

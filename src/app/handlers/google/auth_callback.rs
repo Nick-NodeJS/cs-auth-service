@@ -29,7 +29,7 @@ pub async fn auth_callback(
         return Ok(HttpResponse::Ok().json(tokens_as_json((tokens.access_token, refresh_token))));
     } else {
         log::warn!(
-            "\nUser id: {} google token response has no refresh token\n",
+            "\nGoogle user_id: {} google token response has no refresh token\n",
             user_profile.user_id
         );
         // TODO: get user session on this step and use it in set_user_and_session
@@ -45,7 +45,7 @@ pub async fn auth_callback(
             );
         } else {
             log::warn!(
-                "\nGoogle user id: {} has no refresh token. Should relogin\n",
+                "\nGoogle user_id: {} has no refresh token in system. Should relogin\n",
                 user_profile.user_id
             );
             google_service

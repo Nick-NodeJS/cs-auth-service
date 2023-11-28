@@ -10,7 +10,7 @@ pub struct GoogleConfig {
     pub google_token_url: String,
     pub google_revoke_url: String,
     pub google_redirect_url: String,
-    pub google_plus_me_url: String,
+    pub google_userinfo_url: String,
     pub google_cert_url: String,
     pub google_cache_state_ttl_sec: u32,
     pub google_test_token: String,
@@ -34,8 +34,8 @@ impl GoogleConfig {
             .expect("Missing the GOOGLE_REVOKE_URL environment variable.");
         let google_redirect_url = dotenv::var("GOOGLE_REDIRECT_URL")
             .expect("Missing the GOOGLE_REDIRECT_URL environment variable.");
-        let google_plus_me_url = dotenv::var("GOOGLE_PLUS_ME_URL")
-            .expect("Missing the GOOGLE_PLUS_ME_URL environment variable.");
+        let google_userinfo_url = dotenv::var("GOOGLE_USERINFO_URL")
+            .expect("Missing the GOOGLE_USERINFO_URL environment variable.");
         let google_cert_url = dotenv::var("GOOGLE_CERT_URL")
             .expect("Missing the GOOGLE_CERT_URL environment variable.");
         let google_cache_certs_key = dotenv::var("GOOGLE_CACHE_CERTS_KEY")
@@ -60,7 +60,7 @@ impl GoogleConfig {
             google_token_url,
             google_revoke_url,
             google_redirect_url,
-            google_plus_me_url,
+            google_userinfo_url,
             google_cert_url,
             google_cache_state_ttl_sec,
             google_cache_certs_key,
