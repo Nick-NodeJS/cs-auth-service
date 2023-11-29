@@ -51,6 +51,7 @@ pub async fn auth_callback(
             google_service
                 .revoke_token(tokens.access_token.clone())
                 .await?;
+            // TODO: investigate if it's better for UX to pass throw login to return auth_url on this step
             return Ok(HttpResponse::Unauthorized()
                 .json(error_as_json("User should relogin to Google".to_string())));
         }
