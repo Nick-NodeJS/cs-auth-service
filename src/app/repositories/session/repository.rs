@@ -27,9 +27,7 @@ impl SessionRepository {
             log::debug!("No session in cache, session_key: {}", session_key);
             return Ok(None);
         }
-        let session_json = serde_json::to_value(&session_map)?;
-        // TODO: fix DateTime deserialization issue(in cache fiels is: "2023-11-28T17:51:24.536Z")
-        let session: Result<Session, SerdeJsonError> = serde_json::from_value(session_json);
+        let session = Session::from_hashmap(session_map);
         match session {
             Ok(session) => Ok(Some(session)),
             Err(err) => {
