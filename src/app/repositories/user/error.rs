@@ -2,6 +2,8 @@ use mongodb::bson::ser::Error as MongoDBBsonError;
 use redis::RedisError;
 use thiserror::Error;
 
+use crate::app::services::cache::error::CacheServiceError;
+
 #[derive(Debug, Error)]
 pub enum UserRepositoryError {
     #[error("MongoDB error")]
@@ -18,6 +20,12 @@ pub enum UserRepositoryError {
 
     #[error("UpdateUser error")]
     UpdateUserError,
+
+    #[error("CacheService error")]
+    CacheServiceError,
+
+    #[error("SerdeJson error")]
+    SerdeJsonError,
 }
 
 impl From<RedisError> for UserRepositoryError {
@@ -44,5 +52,19 @@ impl From<mongodb::bson::de::Error> for UserRepositoryError {
     fn from(err: mongodb::bson::de::Error) -> Self {
         log::debug!("mongodb::bson::de::Error: {}", err);
         return UserRepositoryError::MongoDBBsonDeError;
+    }
+}
+
+impl From<CacheServiceError> for UserRepositoryError {
+    fn from(err: CacheServiceError) -> Self {
+        log::debug!("CacheServiceError: {}", err);
+        return UserRepositoryError::CacheServiceError;
+    }
+}
+
+impl From<serde_json::Error> for UserRepositoryError {
+    fn from(err: serde_json::Error) -> Self {
+        log::debug!("serde_json::Error: {}", err);
+        return UserRepositoryError::SerdeJsonError;
     }
 }

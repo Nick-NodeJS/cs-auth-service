@@ -73,6 +73,12 @@ impl User {
         }
         user
     }
+    pub fn get_user_cache_key(user_id: &str) -> String {
+        format!("user:{}", user_id)
+    }
+    pub fn user_to_cache_string(user: User) -> Result<String, serde_json::Error> {
+        serde_json::to_string::<User>(&user)
+    }
 }
 
 impl CollectionType for User {}

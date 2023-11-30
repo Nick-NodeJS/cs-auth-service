@@ -60,7 +60,7 @@ impl UserService {
     }
 
     pub async fn create_user_with_profile(
-        &self,
+        &mut self,
         user_profile: UserProfile,
     ) -> Result<User, UserServiceError> {
         if let Some(user) = self.get_user_by_profile(user_profile.clone()).await? {
@@ -73,24 +73,24 @@ impl UserService {
     }
 
     pub async fn update_user_with_profile(
-        &self,
+        &mut self,
         user_id: ObjectId,
         user_profile: UserProfile,
     ) -> Result<User, UserServiceError> {
         let query = UserRepository::get_update_user_profile_query(user_profile);
-        let user = self
-            .user_repository
-            .update_user(UserRepository::get_find_user_by_id_query(user_id), query)
-            .await?;
+        let user = self.user_repository.update_user(user_id, query).await?;
         Ok(user)
     }
 
     pub async fn get_user_by_profile(
-        &self,
+        &mut self,
         user_profile: UserProfile,
     ) -> Result<Option<User>, UserServiceError> {
-        let query = UserRepository::get_find_user_by_profile_query(user_profile);
-        Ok(self.user_repository.get_user(query).await?)
+        let user = self
+            .user_repository
+            .find_user_by_profile(user_profile)
+            .await?;
+        Ok(user)
     }
 
     pub async fn create_user_and_session(
