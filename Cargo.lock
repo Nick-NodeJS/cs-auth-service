@@ -618,6 +618,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -1601,6 +1602,8 @@ dependencies = [
  "percent-encoding",
  "rand",
  "ryu",
+ "serde",
+ "serde_json",
  "sha1_smol",
  "socket2 0.4.10",
  "url",

@@ -4,7 +4,6 @@ use actix_web::http::header::InvalidHeaderValue;
 use awc::error::{JsonPayloadError, SendRequestError};
 use jsonwebtoken::errors::Error as JWTError;
 use oauth2::RequestTokenError;
-use redis::RedisError;
 use thiserror::Error;
 
 use crate::app::services::cache::error::CacheServiceError;

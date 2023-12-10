@@ -1,8 +1,7 @@
-use bson::oid::ObjectId;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use derivative::Derivative;
+use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::fmt::{self, Display};
 use std::str::FromStr;
 
 use actix_web::http::Method;
@@ -21,15 +20,16 @@ use oauth2::{
     RevocationUrl, Scope, TokenUrl,
 };
 
+use crate::app::models::session_tokens::SessionTokens;
+use crate::app::models::token::Token;
 use crate::app::models::user::GoogleProfile;
 use crate::app::services::cache::service::{CacheService, CacheServiceType};
 use crate::app::services::common::get_x_www_form_headers;
+use crate::app::services::google::structures::GoogleTokenResponse;
 use crate::config::google_config::GoogleConfig;
 
 use super::error::GoogleServiceError;
-use super::structures::{
-    GoogleCert, GoogleKeys, GoogleTokens, TokenClaims, TokenHeaderObject, UserInfo,
-};
+use super::structures::{GoogleCert, GoogleKeys, TokenClaims, TokenHeaderObject, UserInfo};
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -37,8 +37,6 @@ pub struct GoogleService {
     oauth2_client: BasicClient,
     cache_service: CacheService,
     config: GoogleConfig,
-    // #[derivative(Debug = "ignore")]
-    // google_oauth2_decoding_keys: HashMap<String, (GoogleCert, DecodingKey)>,
 }
 
 impl GoogleService {
@@ -138,7 +136,7 @@ impl GoogleService {
         &mut self,
         code: String,
         state: String,
-    ) -> Result<GoogleTokens, GoogleServiceError> {
+    ) -> Result<SessionTokens, GoogleServiceError> {
         // get pkce_code_verifier
         let pkce_code_verifier = self.get_pkce_code_verifier(&state)?;
         // Exchange the code with a token.
@@ -179,18 +177,12 @@ impl GoogleService {
             );
             return Err(GoogleServiceError::OAuth2RequestTokenError);
         }
-        let result = serde_json::from_slice::<GoogleTokens>(&response.body)?;
-        log::debug!("\nGoogle token response: {:?}\n", result);
-        // TODO: reimplement json body parsing more efficient to get strings without extra symbols(")
-        Ok(result)
+        let response = serde_json::from_slice::<GoogleTokenResponse>(&response.body)?;
+        log::debug!("\nGoogle token response: {:?}\n", response);
+        let tokens = get_session_tokens(response);
+        Ok(tokens)
     }
 
-    /*
-    TODO: reimplement certificates logic.
-    - they should be received in initial step and stored in cache with expiration which is in header response
-    - in case no certificates in cache update them by getting again request to GAPI
-    - in case fail on this step or in case the token is wrong, try to use GAPI /v3/token endpoint to get user profile
-     */
     pub async fn get_token_key(
         &mut self,
         token: &str,
@@ -223,20 +215,24 @@ impl GoogleService {
 
     pub async fn get_user_profile(
         &mut self,
-        token: &str,
+        token: Option<Token>,
     ) -> Result<GoogleProfile, GoogleServiceError> {
-        let key = match self.get_token_key(token.clone()).await? {
+        let access_token = match token {
+            Some(token) => token.token_string,
+            None => return Err(GoogleServiceError::BadTokenStructure),
+        };
+        let key = match self.get_token_key(access_token.clone().as_ref()).await? {
             Some(decoding_key) => decoding_key,
             None => {
                 log::warn!(
                     "No decoding key for token: {}\n Trying to get user profile on GAPI...",
-                    token
+                    access_token
                 );
                 // TODO: implement http request to https://oauth2.googleapis.com/token to get user profile
-                return self.get_user_profile_on_gapi(token).await;
+                return self.get_user_profile_on_gapi(&access_token).await;
             }
         };
-        let token_data = decode_token(token, &key, true)?;
+        let token_data = decode_token(&access_token, &key, true)?;
         log::debug!("\nToken data: {:?}\n", token_data);
 
         Ok(GoogleProfile {
@@ -310,10 +306,9 @@ impl GoogleService {
         }
     }
 
-    pub async fn revoke_token(&self, token: String) -> Result<(), GoogleServiceError> {
-        // TODO: implement Google API token revoketion
+    pub async fn revoke_token(&self, token: &str) -> Result<(), GoogleServiceError> {
         let mut url = Url::parse(&self.config.google_revoke_url).expect("parse url error");
-        url.set_query(Some(format!("token={}", token).as_ref()));
+        url.set_query(Some(format!("token={}", token.clone()).as_ref()));
         let revoke_response = match async_http_client(HttpRequest {
             method: Method::POST,
             url,
@@ -329,10 +324,14 @@ impl GoogleService {
             }
         };
         if !revoke_response.status_code.is_success() {
+            let body = match serde_json::from_slice::<Value>(&revoke_response.body) {
+                Ok(value) => value,
+                Err(_) => json!({"body":revoke_response.body}),
+            };
             log::error!(
                 "Google revoke token response fail. response status_code: {:?}, body: {:?}",
                 revoke_response.status_code,
-                revoke_response.body
+                body
             );
             return Err(GoogleServiceError::RevokeRequestError);
         }
@@ -371,6 +370,27 @@ impl GoogleService {
     }
 }
 
+pub fn get_session_tokens(tokens: GoogleTokenResponse) -> SessionTokens {
+    let expire = Some(Utc::now() + Duration::seconds(tokens.expires_in));
+    let refresh_token = match tokens.refresh_token {
+        Some(token) => Some(Token {
+            token_string: token,
+            expire: None,
+        }),
+        None => None,
+    };
+    SessionTokens {
+        access_token: Some(Token {
+            token_string: tokens.id_token,
+            expire,
+        }),
+        refresh_token,
+        extra_token: Some(Token {
+            token_string: tokens.access_token,
+            expire,
+        }),
+    }
+}
 pub fn decode_token(
     token: &str,
     key: &DecodingKey,

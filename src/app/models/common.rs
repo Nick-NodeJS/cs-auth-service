@@ -4,8 +4,14 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum AuthProviders {
+    CyberSherlock,
     Google,
     Facebook,
+}
+impl AuthProviders {
+    pub fn to_string(&self) -> String {
+        format!("{:?}", self)
+    }
 }
 
 impl FromStr for AuthProviders {

@@ -2,9 +2,8 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 
-use redis::{Client, Connection, FromRedisValue, RedisResult, ToRedisArgs};
-use redis::{Commands, RedisError};
-use serde_json::Value;
+use redis::Commands;
+use redis::{Client, Connection, FromRedisValue};
 
 use crate::config::redis_config::RedisConfig;
 
@@ -18,7 +17,7 @@ pub enum CacheServiceType {
 }
 #[derive(Clone, Debug)]
 pub struct CacheService {
-    client: Client,
+    pub client: Client,
 }
 
 impl CacheService {
@@ -33,15 +32,41 @@ impl CacheService {
         Ok(CacheService { client })
     }
 
-    pub fn hmset(&mut self, key: &str, items: &[(&str, String)]) -> Result<(), CacheServiceError> {
+    // pub fn transaction(&mut self, key: &str, value: &str) -> Result<(), CacheServiceError> {
+    //     let mut connection = self.get_connection()?;
+    //     let command = redis::transaction(&mut connection, &[key], |con, pipe| {
+    //         pipe.cmd("MULTI")
+    //             .cmd("RPUSH")
+    //             .arg("u.sess")
+    //             .arg("google::1")
+    //             .cmd("RPUSH")
+    //             .arg("u.sess")
+    //             .arg("google::2")
+    //             .cmd("EXEC")
+    //             .query::<String>(con);
+    //         Ok(Some(()))
+    //     })?;
+    //     Ok(())
+    // }
+
+    pub fn hset(&mut self, key: &str, items: (&str, String)) -> Result<(), CacheServiceError> {
         let mut connection = self.get_connection()?;
-        connection.hset_multiple(key, items)?;
+        connection.hset(key, items.0, items.1)?;
         Ok(())
     }
 
-    pub fn hmget(&mut self, key: &str) -> Result<HashMap<String, String>, CacheServiceError> {
+    pub fn hgetall(&mut self, key: &str) -> Result<HashMap<String, String>, CacheServiceError> {
         let mut connection = self.get_connection()?;
         let result: HashMap<String, String> = connection.hgetall(key)?;
+        Ok(result)
+    }
+
+    pub fn mget<T: FromRedisValue>(
+        &mut self,
+        keys: Vec<String>,
+    ) -> Result<Vec<Option<T>>, CacheServiceError> {
+        let mut connection = self.get_connection()?;
+        let result: Vec<Option<T>> = connection.mget(keys)?;
         Ok(result)
     }
 

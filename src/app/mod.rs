@@ -8,6 +8,7 @@ mod services;
 use actix_web::{middleware::Logger, web, App, HttpServer};
 
 use crate::app::app_data::AppData;
+use crate::app::handlers::logout::logout;
 use crate::config::app_config::AppConfig;
 use env_logger::Env;
 use log::info;
@@ -47,8 +48,9 @@ pub async fn run() -> std::io::Result<()> {
                 web::scope(format!("/api/{}", app_config.api_version).as_ref())
                     .service(
                         web::scope("/auth")
-                            .route("/google", web::get().to(login_with_google))
-                            .route("/google/callback", web::get().to(google_auth_callback)),
+                            .route("/google/login", web::get().to(login_with_google))
+                            .route("/google/callback", web::get().to(google_auth_callback))
+                            .route("/logout", web::get().to(logout)),
                     )
                     .route("/status", web::get().to(status)), // .service(
                                                               //     web::scope("/users")

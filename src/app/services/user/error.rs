@@ -13,9 +13,6 @@ pub enum UserServiceError {
     #[error("UserRepository error")]
     UserRepositoryError,
 
-    #[error("Wrong profile error")]
-    WrongProfileError,
-
     #[error("SessionService error")]
     SessionServiceError,
 

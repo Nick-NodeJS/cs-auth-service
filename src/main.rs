@@ -13,7 +13,6 @@ async fn main() -> std::io::Result<()> {
 /*
 TODO:
 - finish sessions
-- implement caching on user/storage services
 - investigate if it makes sense to enable caching on handlers
 - implement me endpoint
 - set swagger

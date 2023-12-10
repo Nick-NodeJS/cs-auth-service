@@ -3,7 +3,6 @@ use std::sync::PoisonError;
 use actix_web::http;
 use actix_web_thiserror_derive::ResponseError;
 use log::error;
-use redis::RedisError;
 use thiserror::Error;
 
 use super::services::{

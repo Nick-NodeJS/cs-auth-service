@@ -1,6 +1,5 @@
-use std::fmt::{self, Display};
+use std::fmt::{self};
 
-use jsonwebtoken::DecodingKey;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -33,10 +32,13 @@ impl<'a> fmt::Display for DisplayGoogleCerts<'a> {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct GoogleTokens {
+pub struct GoogleTokenResponse {
     pub access_token: String,
     pub id_token: String,
     pub refresh_token: Option<String>,
+    pub token_type: String,
+    pub scope: String,
+    pub expires_in: i64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

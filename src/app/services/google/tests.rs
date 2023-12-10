@@ -10,7 +10,7 @@ mod tests {
     #[test]
     /*
         TODO:
-       It must to make GAPI request to ket fresh key. Response has couple of options.
+       It must to make GAPI request to get fresh key. Response has couple of options.
        The right option is the one which 'kid' is inside of token header
        Do not forget update Google Service to decode token properly
     */
