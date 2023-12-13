@@ -96,22 +96,21 @@ impl UserRepository {
         &mut self,
         user_id: ObjectId,
     ) -> Result<Option<User>, UserRepositoryError> {
-        let user_cache_string = match self
+        let user = match self
             .cache
-            .get_value(&User::get_user_cache_key(user_id.to_string().as_ref()))?
+            .get_value::<User>(&User::get_user_cache_key(user_id.to_string().as_ref()))?
         {
             Some(user_string) => user_string,
             None => return Ok(None),
         };
 
-        let user: User = serde_json::from_str(&user_cache_string)?;
         Ok(Some(user))
     }
 
     fn set_user_in_cache(&mut self, user: User) -> Result<(), UserRepositoryError> {
-        self.cache.set_value_with_ttl(
+        self.cache.set_value_with_ttl::<User>(
             &User::get_user_cache_key(user.id.to_string().as_ref()),
-            User::user_to_cache_string(user)?.as_ref(),
+            user,
             self.config.user_cache_ttl_sec as usize,
         )?;
         Ok(())

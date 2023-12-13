@@ -1,7 +1,12 @@
 use bson::doc;
 use chrono::{DateTime, Utc};
 use mongodb::bson::oid::ObjectId;
+use redis::{
+    ErrorKind, FromRedisValue, RedisError, RedisResult, RedisWrite, ToRedisArgs,
+    Value as RedisValue,
+};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 use crate::app::services::storage::service::CollectionType;
 
@@ -97,9 +102,41 @@ impl User {
     pub fn get_user_cache_key(user_id: &str) -> String {
         format!("user::{}", user_id)
     }
-    pub fn user_to_cache_string(user: User) -> Result<String, serde_json::Error> {
-        serde_json::to_string::<User>(&user)
-    }
 }
 
 impl CollectionType for User {}
+
+impl ToRedisArgs for User {
+    fn write_redis_args<W>(&self, out: &mut W)
+    where
+        W: ?Sized + RedisWrite,
+    {
+        out.write_arg(
+            json!({
+                "id": self.id,
+                "active_profile": self.active_profile,
+                "cybersherlock": self.cybersherlock,
+                "google": self.google,
+                "facebook": self.facebook,
+                // TODO: check if we need more accurate precision
+                "created_at": self.created_at.to_string(),
+                "updated_at": self.updated_at.to_string(),
+            })
+            .to_string()
+            .as_bytes(),
+        );
+    }
+}
+
+impl FromRedisValue for User {
+    fn from_redis_value(value: &RedisValue) -> RedisResult<User> {
+        match *value {
+            RedisValue::Data(ref data) => Ok(serde_json::from_slice::<User>(data)?),
+            _ => Err(RedisError::from((
+                ErrorKind::TypeError,
+                "Response was of incompatible type",
+                format!("(response was {:?})", value),
+            ))),
+        }
+    }
+}

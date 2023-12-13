@@ -35,9 +35,9 @@ impl SessionRepository {
         session_ttl: i64,
     ) -> Result<(), SessionRepositoryError> {
         // TODO: implement user sessions in cache array updating in parallel(in one step) with session set
-        self.storage.set_value_with_ttl(
+        self.storage.set_value_with_ttl::<String>(
             session_key,
-            Session::session_to_cache_string(&session)?.as_ref(),
+            CacheService::struct_to_cache_string(&session)?,
             session_ttl as usize,
         )?;
         self.storage.hset(

@@ -12,6 +12,9 @@ impl AuthProviders {
     pub fn to_string(&self) -> String {
         format!("{:?}", self)
     }
+    pub fn is_equal(&self, provider: &AuthProviders) -> bool {
+        self.to_string() == provider.to_string()
+    }
 }
 
 impl FromStr for AuthProviders {

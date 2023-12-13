@@ -11,28 +11,34 @@ use super::{
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct NewSessionData {
+    pub auth_provider: AuthProviders,
+    pub user_id: ObjectId,
+    pub tokens: SessionTokens,
+    pub session_metadata: SessionMetadata,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Session {
     pub auth_provider: AuthProviders,
     pub user_id: ObjectId,
     pub session_id: Uuid,
     pub tokens: SessionTokens,
     pub metadata: SessionMetadata,
-    #[serde(with = "chrono_datetime_as_bson_datetime")]
     created_at: DateTime<Utc>,
-    #[serde(with = "chrono_datetime_as_bson_datetime")]
     pub updated_at: DateTime<Utc>,
 }
 
 impl Session {
-    pub fn new(auth_provider: AuthProviders, tokens: SessionTokens, user_id: ObjectId) -> Self {
+    pub fn new(session_data: NewSessionData) -> Self {
         let now = Utc::now();
         Session {
-            auth_provider,
-            user_id,
+            auth_provider: session_data.auth_provider,
+            user_id: session_data.user_id,
             // TODO: update session_id generation according to actix-web example
             session_id: Uuid::new_v4(),
-            tokens,
-            metadata: SessionMetadata::new(),
+            tokens: session_data.tokens,
+            metadata: session_data.session_metadata,
             created_at: now,
             updated_at: now,
         }
@@ -42,9 +48,6 @@ impl Session {
     }
     pub fn get_user_sessions_key(user_id: &str) -> String {
         format!("user::sessions::{}", user_id)
-    }
-    pub fn session_to_cache_string(session: &Session) -> Result<String, serde_json::Error> {
-        serde_json::to_string::<Session>(session)
     }
     pub fn get_id_json(session: Session) -> Value {
         // it should use encrypted session_id(see actix-web example)

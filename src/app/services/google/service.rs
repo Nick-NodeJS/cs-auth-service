@@ -20,6 +20,7 @@ use oauth2::{
     RevocationUrl, Scope, TokenUrl,
 };
 
+use crate::app::models::session_metadata::SessionMetadata;
 use crate::app::models::session_tokens::SessionTokens;
 use crate::app::models::token::Token;
 use crate::app::models::user::GoogleProfile;
@@ -29,7 +30,9 @@ use crate::app::services::google::structures::GoogleTokenResponse;
 use crate::config::google_config::GoogleConfig;
 
 use super::error::GoogleServiceError;
-use super::structures::{GoogleCert, GoogleKeys, TokenClaims, TokenHeaderObject, UserInfo};
+use super::structures::{
+    GoogleCert, GoogleKeys, LoginCacheData, TokenClaims, TokenHeaderObject, UserInfo,
+};
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -106,21 +109,26 @@ impl GoogleService {
     pub fn set_auth_data_to_cache(
         &mut self,
         csrf_state: &str,
-        pkce_code_verifier: &str,
+        login_cache_data: &LoginCacheData,
     ) -> Result<(), GoogleServiceError> {
-        self.cache_service.set_value_with_ttl(
+        self.cache_service.set_value_with_ttl::<String>(
             csrf_state,
-            &pkce_code_verifier,
+            CacheService::struct_to_cache_string(login_cache_data)?,
             self.config.google_cache_state_ttl_sec as usize,
         )?;
         Ok(())
     }
 
-    pub fn get_pkce_code_verifier(&mut self, state: &str) -> Result<String, GoogleServiceError> {
+    pub fn get_pkce_code_verifier(
+        &mut self,
+        state: &str,
+    ) -> Result<LoginCacheData, GoogleServiceError> {
         // process code and state
-        let try_code: Option<String> = self.cache_service.get_value(state.clone().as_ref())?;
-        if let Some(pkce_code_verifier_from_cache) = try_code {
-            Ok(pkce_code_verifier_from_cache)
+        let login_cache_data_value = self
+            .cache_service
+            .get_value::<LoginCacheData>(state.clone().as_ref())?;
+        if let Some(login_cache_data) = login_cache_data_value {
+            Ok(login_cache_data)
         } else {
             log::debug!("No callback request state {} in Redis", state);
             return Err(GoogleServiceError::CallbackStateCacheError);
@@ -135,10 +143,8 @@ impl GoogleService {
     pub async fn get_tokens(
         &mut self,
         code: String,
-        state: String,
+        pkce_code_verifier: String,
     ) -> Result<SessionTokens, GoogleServiceError> {
-        // get pkce_code_verifier
-        let pkce_code_verifier = self.get_pkce_code_verifier(&state)?;
         // Exchange the code with a token.
 
         // oauth2::BasicClient doesn't have in StandartTokenResponse "id_token"
@@ -148,7 +154,7 @@ impl GoogleService {
         log::debug!(
             "\ncode: {},\npkce_code_verifier: {}\n",
             code,
-            pkce_code_verifier
+            &pkce_code_verifier
         );
         let params: Vec<(&str, &str)> = vec![
             ("code", &code),
@@ -359,7 +365,7 @@ impl GoogleService {
     ) -> Result<Option<Vec<GoogleCert>>, GoogleServiceError> {
         let try_certs = self
             .cache_service
-            .get_value(&self.config.google_cache_certs_key)?;
+            .get_value::<String>(&self.config.google_cache_certs_key)?;
         match try_certs {
             Some(certs_string) => {
                 let certs = serde_json::from_str::<Vec<GoogleCert>>(&certs_string)?;

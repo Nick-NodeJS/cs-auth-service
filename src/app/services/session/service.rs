@@ -3,7 +3,11 @@ use bson::oid::ObjectId;
 use crate::{
     app::{
         models::{
-            common::AuthProviders, session::Session, session_tokens::SessionTokens, user::User,
+            common::AuthProviders,
+            session::{NewSessionData, Session},
+            session_metadata::SessionMetadata,
+            session_tokens::SessionTokens,
+            user::User,
         },
         repositories::session::repository::SessionRepository,
     },
@@ -30,8 +34,10 @@ impl SessionService {
     ) -> Result<Vec<Session>, SessionServiceError> {
         let sessions_key = Session::get_user_sessions_key(&user_id.to_string());
         let sessions = self.repository.get_sessions(sessions_key.as_ref()).await?;
-        // TODO: check how to compare auth_provider
-        let user_sessions = sessions.into_iter().filter(|s| true).collect();
+        let user_sessions = sessions
+            .into_iter()
+            .filter(|s| s.auth_provider.is_equal(&auth_provider))
+            .collect();
         Ok(user_sessions)
     }
 
@@ -39,11 +45,9 @@ impl SessionService {
     // - set session ttl as token expiration
     pub async fn set_new_session(
         &mut self,
-        auth_provider: AuthProviders,
-        user: User,
-        tokens: SessionTokens,
+        new_session_data: NewSessionData,
     ) -> Result<Session, SessionServiceError> {
-        let session = Session::new(auth_provider.clone(), tokens, user.id);
+        let session = Session::new(new_session_data);
         let session_key = Session::get_session_key(&session);
         self.repository
             .set_session(&session_key, &session, self.config.session_ttl_sec)

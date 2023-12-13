@@ -2,8 +2,11 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 
-use redis::Commands;
+use chrono::{DateTime, Utc};
 use redis::{Client, Connection, FromRedisValue};
+use redis::{Commands, ToRedisArgs};
+use serde::{Serialize, Serializer};
+use serde_json::{json, Value};
 
 use crate::config::redis_config::RedisConfig;
 
@@ -70,21 +73,50 @@ impl CacheService {
         Ok(result)
     }
 
-    pub fn set_value_with_ttl(
+    pub fn set_value_with_ttl<T>(
         &mut self,
         key: &str,
-        value: &str,
+        value: T,
         seconds: usize,
-    ) -> Result<(), CacheServiceError> {
+    ) -> Result<(), CacheServiceError>
+    where
+        T: ToRedisArgs,
+    {
         let mut connection = self.get_connection()?;
         connection.set_ex(key, value, seconds)?;
         Ok(())
     }
 
-    pub fn get_value(&mut self, key: &str) -> Result<Option<String>, CacheServiceError> {
+    pub fn get_value<T: FromRedisValue>(
+        &mut self,
+        key: &str,
+    ) -> Result<Option<T>, CacheServiceError> {
         let mut connection = self.get_connection()?;
-        let value: Option<String> = connection.get(key)?;
+        let value: Option<T> = connection.get(key)?;
         Ok(value)
+    }
+
+    pub fn struct_to_cache_string<T: Serialize>(data: &T) -> Result<String, serde_json::Error> {
+        let origin_json_value = serde_json::to_value(data.clone())?;
+        let mut result_json_value = json!({});
+        if let Value::Object(ref map) = origin_json_value {
+            for (key, value) in map.iter() {
+                if value.is_object() {
+                    if let Value::Object(ref date_map) = value {
+                        if let Some(date) = date_map.get("$date") {
+                            log::debug!("Key: {}, DayTime: {}", &key, format!("{}", date));
+                            result_json_value[key] = Value::from(format!("{}", date));
+                        } else {
+                            result_json_value[key] = value.to_owned();
+                        }
+                    }
+                } else {
+                    result_json_value[key] = value.to_owned();
+                }
+            }
+        }
+        log::debug!("RESULT: {:?}", &result_json_value);
+        Ok(result_json_value.to_string())
     }
 
     fn get_connection(&self) -> Result<Connection, CacheServiceError> {
