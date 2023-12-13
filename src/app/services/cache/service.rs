@@ -2,9 +2,11 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 
-use redis::{Client, Connection, FromRedisValue, RedisResult, ToRedisArgs};
-use redis::{Commands, RedisError};
-use serde_json::Value;
+use chrono::{DateTime, Utc};
+use redis::{Client, Connection, FromRedisValue};
+use redis::{Commands, ToRedisArgs};
+use serde::{Serialize, Serializer};
+use serde_json::{json, Value};
 
 use crate::config::redis_config::RedisConfig;
 
@@ -18,7 +20,7 @@ pub enum CacheServiceType {
 }
 #[derive(Clone, Debug)]
 pub struct CacheService {
-    client: Client,
+    pub client: Client,
 }
 
 impl CacheService {
@@ -33,33 +35,88 @@ impl CacheService {
         Ok(CacheService { client })
     }
 
-    pub fn hmset(&mut self, key: &str, items: &[(&str, String)]) -> Result<(), CacheServiceError> {
+    // pub fn transaction(&mut self, key: &str, value: &str) -> Result<(), CacheServiceError> {
+    //     let mut connection = self.get_connection()?;
+    //     let command = redis::transaction(&mut connection, &[key], |con, pipe| {
+    //         pipe.cmd("MULTI")
+    //             .cmd("RPUSH")
+    //             .arg("u.sess")
+    //             .arg("google::1")
+    //             .cmd("RPUSH")
+    //             .arg("u.sess")
+    //             .arg("google::2")
+    //             .cmd("EXEC")
+    //             .query::<String>(con);
+    //         Ok(Some(()))
+    //     })?;
+    //     Ok(())
+    // }
+
+    pub fn hset(&mut self, key: &str, items: (&str, String)) -> Result<(), CacheServiceError> {
         let mut connection = self.get_connection()?;
-        connection.hset_multiple(key, items)?;
+        connection.hset(key, items.0, items.1)?;
         Ok(())
     }
 
-    pub fn hmget(&mut self, key: &str) -> Result<HashMap<String, String>, CacheServiceError> {
+    pub fn hgetall(&mut self, key: &str) -> Result<HashMap<String, String>, CacheServiceError> {
         let mut connection = self.get_connection()?;
         let result: HashMap<String, String> = connection.hgetall(key)?;
         Ok(result)
     }
 
-    pub fn set_value_with_ttl(
+    pub fn mget<T: FromRedisValue>(
+        &mut self,
+        keys: Vec<String>,
+    ) -> Result<Vec<Option<T>>, CacheServiceError> {
+        let mut connection = self.get_connection()?;
+        let result: Vec<Option<T>> = connection.mget(keys)?;
+        Ok(result)
+    }
+
+    pub fn set_value_with_ttl<T>(
         &mut self,
         key: &str,
-        value: &str,
+        value: T,
         seconds: usize,
-    ) -> Result<(), CacheServiceError> {
+    ) -> Result<(), CacheServiceError>
+    where
+        T: ToRedisArgs,
+    {
         let mut connection = self.get_connection()?;
         connection.set_ex(key, value, seconds)?;
         Ok(())
     }
 
-    pub fn get_value(&mut self, key: &str) -> Result<Option<String>, CacheServiceError> {
+    pub fn get_value<T: FromRedisValue>(
+        &mut self,
+        key: &str,
+    ) -> Result<Option<T>, CacheServiceError> {
         let mut connection = self.get_connection()?;
-        let value: Option<String> = connection.get(key)?;
+        let value: Option<T> = connection.get(key)?;
         Ok(value)
+    }
+
+    pub fn struct_to_cache_string<T: Serialize>(data: &T) -> Result<String, serde_json::Error> {
+        let origin_json_value = serde_json::to_value(data.clone())?;
+        let mut result_json_value = json!({});
+        if let Value::Object(ref map) = origin_json_value {
+            for (key, value) in map.iter() {
+                if value.is_object() {
+                    if let Value::Object(ref date_map) = value {
+                        if let Some(date) = date_map.get("$date") {
+                            log::debug!("Key: {}, DayTime: {}", &key, format!("{}", date));
+                            result_json_value[key] = Value::from(format!("{}", date));
+                        } else {
+                            result_json_value[key] = value.to_owned();
+                        }
+                    }
+                } else {
+                    result_json_value[key] = value.to_owned();
+                }
+            }
+        }
+        log::debug!("RESULT: {:?}", &result_json_value);
+        Ok(result_json_value.to_string())
     }
 
     fn get_connection(&self) -> Result<Connection, CacheServiceError> {

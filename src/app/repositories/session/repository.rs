@@ -1,11 +1,4 @@
-use std::collections::HashMap;
-
-use serde_json::{Error as SerdeJsonError, Value};
-
-use crate::app::{
-    models::session::{session_as_key_value_vec, Session},
-    services::cache::service::CacheService,
-};
+use crate::app::{models::session::Session, services::cache::service::CacheService};
 
 use super::error::SessionRepositoryError;
 
@@ -18,36 +11,42 @@ impl SessionRepository {
         SessionRepository { storage }
     }
 
-    pub async fn get_session(
+    pub async fn get_sessions(
         &mut self,
-        session_key: &str,
-    ) -> Result<Option<Session>, SessionRepositoryError> {
-        let session_map = self.storage.hmget(session_key.clone())?;
-        if session_map.len() == 0 {
-            log::debug!("No session in cache, session_key: {}", session_key);
-            return Ok(None);
+        user_sessions_key: &str,
+    ) -> Result<Vec<Session>, SessionRepositoryError> {
+        let session_keys = self.storage.hgetall(user_sessions_key)?;
+        if session_keys.len() == 0 {
+            return Ok(vec![]);
         }
-        let session = Session::from_hashmap(session_map);
-        match session {
-            Ok(session) => Ok(Some(session)),
-            Err(err) => {
-                log::error!(
-                    "Error to deserialize Session: {}, session key:{}",
-                    err,
-                    session_key
-                );
-                Ok(None)
-            }
-        }
+        let keys = session_keys.keys().map(|key| key.to_owned()).collect();
+        let sessions = self.storage.mget::<Session>(keys)?;
+        // in case the session key is still in user session set but session is not in cach
+        // it returns Nil(None) and we filter the array
+        let sessions_without_none = sessions.iter().filter_map(|s| s.to_owned()).collect();
+        log::debug!("User sessions: {:?}", sessions_without_none);
+        Ok(sessions_without_none)
     }
 
     pub async fn set_session(
         &mut self,
         session_key: &str,
-        session: Session,
+        session: &Session,
+        session_ttl: i64,
     ) -> Result<(), SessionRepositoryError> {
-        self.storage
-            .hmset(session_key, &session_as_key_value_vec(session))?;
+        // TODO: implement user sessions in cache array updating in parallel(in one step) with session set
+        self.storage.set_value_with_ttl::<String>(
+            session_key,
+            CacheService::struct_to_cache_string(&session)?,
+            session_ttl as usize,
+        )?;
+        self.storage.hset(
+            &Session::get_user_sessions_key(&session.user_id.to_string()),
+            (
+                Session::get_session_key(&session).as_ref(),
+                session.auth_provider.to_string(),
+            ),
+        )?;
         Ok(())
     }
 }

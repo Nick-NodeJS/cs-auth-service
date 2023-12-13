@@ -2,9 +2,9 @@ use bson::oid::ObjectId;
 use bson::Document;
 use chrono::Utc;
 use mongodb::bson::{self, doc};
-use mongodb::{Collection, Cursor};
+use mongodb::Collection;
 
-use crate::app::models::user::{self, User, UserProfile};
+use crate::app::models::user::{User, UserProfile};
 use crate::app::services::cache::service::CacheService;
 use crate::app::services::storage::service::StorageService;
 use crate::config::user_config::UserConfig;
@@ -96,22 +96,21 @@ impl UserRepository {
         &mut self,
         user_id: ObjectId,
     ) -> Result<Option<User>, UserRepositoryError> {
-        let user_cache_string = match self
+        let user = match self
             .cache
-            .get_value(&User::get_user_cache_key(user_id.to_string().as_ref()))?
+            .get_value::<User>(&User::get_user_cache_key(user_id.to_string().as_ref()))?
         {
             Some(user_string) => user_string,
             None => return Ok(None),
         };
 
-        let user: User = serde_json::from_str(&user_cache_string)?;
         Ok(Some(user))
     }
 
     fn set_user_in_cache(&mut self, user: User) -> Result<(), UserRepositoryError> {
-        self.cache.set_value_with_ttl(
+        self.cache.set_value_with_ttl::<User>(
             &User::get_user_cache_key(user.id.to_string().as_ref()),
-            User::user_to_cache_string(user)?.as_ref(),
+            user,
             self.config.user_cache_ttl_sec as usize,
         )?;
         Ok(())
@@ -119,6 +118,14 @@ impl UserRepository {
 
     pub fn get_update_user_profile_query(user_profile: UserProfile) -> Document {
         let mut data_to_update = match user_profile {
+            UserProfile::CyberSherlock(cyber_sherlock_profile) => {
+                doc! {
+                    "cybersherlock.name": cyber_sherlock_profile.name,
+                    "cybersherlock.email": cyber_sherlock_profile.email,
+                    "cybersherlock.email_verified": cyber_sherlock_profile.email_verified,
+                    "cybersherlock.picture": cyber_sherlock_profile.picture,
+                }
+            }
             UserProfile::Google(google_profile) => {
                 doc! {
                     "google.name": google_profile.name,
@@ -141,6 +148,9 @@ impl UserRepository {
     pub fn get_find_user_by_profile_query(user_profile: UserProfile) -> Document {
         let mut query = doc! {};
         match user_profile {
+            UserProfile::CyberSherlock(cyber_sherlock_profile) => {
+                query.insert("cybersherlock.user_id", cyber_sherlock_profile.user_id);
+            }
             UserProfile::Google(google_profile) => {
                 query.insert("google.user_id", google_profile.user_id);
             }

@@ -1,8 +1,10 @@
-pub fn is_valid_ipv4(ip: &str) -> bool {
-    // TODO upgrade this Regex validation to use some lib
+use std::{net::Ipv4Addr, str::FromStr};
 
-    let ip_pattern = regex::Regex::new(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$").unwrap();
-    ip_pattern.is_match(ip)
+pub fn is_valid_ipv4(ip: &str) -> bool {
+    match Ipv4Addr::from_str(ip) {
+        Ok(_) => true,
+        Err(_) => false,
+    }
 }
 
 pub fn validate_ip_port(_e: u16) -> bool {

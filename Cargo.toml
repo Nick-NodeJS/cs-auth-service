@@ -19,7 +19,7 @@ oauth2 = "4.4.1"
 regex = "1.9.5"
 serde = { version = "1.0", features = ["derive"]}
 url = "2.4.1"
-redis = { version = "0.23.3", features = ["cluster"] }
+redis = { version = "0.23.3", features = ["cluster", "json"] }
 serde_json = "1.0.107"
 thiserror = "1.0.50"
 actix-web-thiserror = "0.2.0"
@@ -29,3 +29,4 @@ mongodb = "2.7.1"
 chrono = "0.4.31"
 bson = { version = "2.7.0", features = ["chrono-0_4"] }
 derivative = "2.2.0"
+uuid = { version = "1.6.1", feature = ["v4", "fast-rng"] }

@@ -1,10 +1,14 @@
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{
+    http::header::ContentType,
+    web::{self},
+    HttpRequest, HttpResponse,
+};
 
 use crate::app::{
     app_data::AppData,
     app_error::AppError,
-    models::user::UserProfile,
-    services::common::{error_as_json, tokens_as_json},
+    models::{session::Session, user::UserProfile},
+    services::common::error_as_json,
 };
 
 pub async fn auth_callback(
@@ -15,45 +19,42 @@ pub async fn auth_callback(
     let mut user_service = app_data.user_service.lock()?;
     let (code, state) = google_service.parse_auth_query_string(req.query_string())?;
 
+    let login_cache_data = google_service.get_pkce_code_verifier(&state)?;
     // process code and state to get tokens
-    let tokens = google_service.get_tokens(code, state).await?;
-    let user_profile = google_service.get_user_profile(&tokens.id_token).await?;
+    let tokens = google_service
+        .get_tokens(code, login_cache_data.pkce_code_verifier)
+        .await?;
+    let user_profile = google_service
+        .get_user_profile(tokens.access_token.clone())
+        .await?;
 
-    // in case Google API returns no refresh token, it has to check if user was logged in before
-    // if No(google refresh token is not in system) - it revoke the token and user has to relogin to Google
-    // TODO: during adding a new or updating an existen user it should set session data(refresh token, login timestamp etc)
-    if let Some(refresh_token) = tokens.refresh_token {
-        user_service
-            .create_user_and_session(UserProfile::Google(user_profile), refresh_token.clone())
-            .await?;
-        return Ok(HttpResponse::Ok().json(tokens_as_json((tokens.access_token, refresh_token))));
+    if let Some(user_session) = user_service
+        .get_user_session(
+            tokens.clone(),
+            UserProfile::Google(user_profile.clone()),
+            login_cache_data.session_metadata,
+        )
+        .await?
+    {
+        log::info!(
+            "User {} loged in with Google successfuly",
+            user_session.user_id
+        );
+        // TODO: set session token to cookie
+        Ok(HttpResponse::Ok().json(Session::get_id_json(user_session)))
     } else {
         log::warn!(
-            "\nGoogle user_id: {} google token response has no refresh token\n",
+            "\nGoogle user_id: {} has no data in system. Should relogin\n",
             user_profile.user_id
         );
-        // TODO: get user session on this step and use it in set_user_and_session
-        if let Some(user_session) = user_service
-            .check_if_user_logged_in_with_profile(UserProfile::Google(user_profile.clone()))
-            .await?
-        {
-            user_service
-                .update_user_and_session(UserProfile::Google(user_profile), user_session.clone())
-                .await?;
-            return Ok(
-                HttpResponse::Ok().json(tokens_as_json((tokens.access_token, user_session.token)))
-            );
-        } else {
-            log::warn!(
-                "\nGoogle user_id: {} has no refresh token in system. Should relogin\n",
-                user_profile.user_id
-            );
+        if let Some(token) = tokens.extra_token {
             google_service
-                .revoke_token(tokens.access_token.clone())
+                .revoke_token(token.token_string.as_ref())
                 .await?;
-            // TODO: investigate if it's better for UX to pass throw login to return auth_url on this step
-            return Ok(HttpResponse::Unauthorized()
-                .json(error_as_json("User should relogin to Google".to_string())));
         }
+        // TODO: investigate if it's better for UX to pass throw login to return auth_url on this step
+        return Ok(
+            HttpResponse::Unauthorized().json(error_as_json("User should relogin to Google"))
+        );
     }
 }

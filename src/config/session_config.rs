@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
 pub struct SessionConfig {
-    pub session_ttl_sec: u32,
+    pub session_ttl_sec: i64,
 }
 
 impl SessionConfig {

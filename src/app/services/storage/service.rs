@@ -1,9 +1,6 @@
-use bson::Document;
-use mongodb::bson::{self, doc};
 use mongodb::options::ClientOptions;
 use mongodb::{Client, Collection, Database};
 
-use crate::app::models::user::User;
 use crate::config::mongodb_config::MongoDBConfig;
 
 use super::error::StorageServiceError;
