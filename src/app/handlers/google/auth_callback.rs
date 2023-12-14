@@ -8,7 +8,10 @@ use crate::app::{
     app_data::AppData,
     app_error::AppError,
     models::{session::Session, user::UserProfile},
-    services::common::error_as_json,
+    services::{
+        common::{error_as_json, result_as_json},
+        session::service::SessionService,
+    },
 };
 
 pub async fn auth_callback(
@@ -41,7 +44,9 @@ pub async fn auth_callback(
             user_session.user_id
         );
         // TODO: set session token to cookie
-        Ok(HttpResponse::Ok().json(Session::get_id_json(user_session)))
+        let mut response = HttpResponse::Ok().json(result_as_json("success"));
+        user_service.set_session_cookie(response.head_mut(), user_session.id)?;
+        Ok(response)
     } else {
         log::warn!(
             "\nGoogle user_id: {} has no data in system. Should relogin\n",

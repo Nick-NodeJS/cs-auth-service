@@ -6,6 +6,9 @@ use crate::app::repositories::session::error::SessionRepositoryError;
 pub enum SessionServiceError {
     #[error("SessionRepository error")]
     SessionRepositoryError,
+
+    #[error("SetCookieToResponse error")]
+    SetCookieToResponseError,
 }
 
 impl From<SessionRepositoryError> for SessionServiceError {

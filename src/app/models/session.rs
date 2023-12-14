@@ -6,6 +6,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
+use std::convert::TryInto;
+
+use rand::{distributions::Alphanumeric, rngs::OsRng, Rng as _};
+
 use super::{
     common::AuthProviders, session_metadata::SessionMetadata, session_tokens::SessionTokens,
 };
@@ -22,10 +26,10 @@ pub struct NewSessionData {
 pub struct Session {
     pub auth_provider: AuthProviders,
     pub user_id: ObjectId,
-    pub session_id: Uuid,
+    pub id: String,
     pub tokens: SessionTokens,
     pub metadata: SessionMetadata,
-    created_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -36,28 +40,41 @@ impl Session {
             auth_provider: session_data.auth_provider,
             user_id: session_data.user_id,
             // TODO: update session_id generation according to actix-web example
-            session_id: Uuid::new_v4(),
+            id: Session::generate_session_id(),
             tokens: session_data.tokens,
             metadata: session_data.session_metadata,
             created_at: now,
             updated_at: now,
         }
     }
-    pub fn get_session_key(session: &Session) -> String {
-        format!("session::{}", session.session_id)
+    pub fn generate_session_id() -> String {
+        //format!("session::{}", session.session_id)
+
+        // Session key generation routine that follows [OWASP recommendations].
+        //
+        // [OWASP recommendations]: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#session-id-entropy
+        //
+        let value = std::iter::repeat(())
+            .map(|()| OsRng.sample(Alphanumeric))
+            .take(64)
+            .collect::<Vec<_>>();
+
+        // These unwraps will never panic because pre-conditions are always verified
+        // (i.e. length and character set)
+        String::from_utf8(value).unwrap().try_into().unwrap()
     }
+    pub fn get_session_key(session: &Session) -> String {
+        format!("session::{}", session.id)
+    }
+
     pub fn get_user_sessions_key(user_id: &str) -> String {
         format!("user::sessions::{}", user_id)
     }
     pub fn get_id_json(session: Session) -> Value {
         // it should use encrypted session_id(see actix-web example)
         json!({
-            "session": session.session_id
+            "session": session.id
         })
-    }
-    pub fn set_session_cookie(session: Session) -> Cookie<'static> {
-        // it should gets session cookie with encrypted session_id
-        todo!()
     }
 }
 

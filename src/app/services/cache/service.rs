@@ -97,26 +97,7 @@ impl CacheService {
     }
 
     pub fn struct_to_cache_string<T: Serialize>(data: &T) -> Result<String, serde_json::Error> {
-        let origin_json_value = serde_json::to_value(data.clone())?;
-        let mut result_json_value = json!({});
-        if let Value::Object(ref map) = origin_json_value {
-            for (key, value) in map.iter() {
-                if value.is_object() {
-                    if let Value::Object(ref date_map) = value {
-                        if let Some(date) = date_map.get("$date") {
-                            log::debug!("Key: {}, DayTime: {}", &key, format!("{}", date));
-                            result_json_value[key] = Value::from(format!("{}", date));
-                        } else {
-                            result_json_value[key] = value.to_owned();
-                        }
-                    }
-                } else {
-                    result_json_value[key] = value.to_owned();
-                }
-            }
-        }
-        log::debug!("RESULT: {:?}", &result_json_value);
-        Ok(result_json_value.to_string())
+        serde_json::to_string::<T>(data)
     }
 
     fn get_connection(&self) -> Result<Connection, CacheServiceError> {

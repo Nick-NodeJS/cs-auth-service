@@ -9,7 +9,7 @@ edition = "2021"
 anyhow = "1.0"
 awc = "3.2.0"
 actix-rt = "2.9.0"
-actix-web = "4.4.0"
+actix-web = { version = "4.4.0", features = ["secure-cookies"]}
 cs_shared_lib = { path = "./cs_shared_lib" }
 dotenv = "0.15.0"
 env_logger = "0.10.0"
@@ -30,3 +30,4 @@ chrono = "0.4.31"
 bson = { version = "2.7.0", features = ["chrono-0_4"] }
 derivative = "2.2.0"
 uuid = { version = "1.6.1", feature = ["v4", "fast-rng"] }
+rand = "0.8.5"
