@@ -1,3 +1,4 @@
+use actix_web::dev::ResponseHead;
 use bson::oid::ObjectId;
 
 use crate::app::{
@@ -164,5 +165,15 @@ impl UserService {
                 .await?;
             Ok(Some(session))
         }
+    }
+
+    pub fn set_session_cookie(
+        &self,
+        response: &mut ResponseHead,
+        session_id: String,
+    ) -> Result<(), UserServiceError> {
+        Ok(self
+            .session_service
+            .set_session_cookie(response, session_id)?)
     }
 }
