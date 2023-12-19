@@ -63,8 +63,8 @@ impl Session {
         // (i.e. length and character set)
         String::from_utf8(value).unwrap().try_into().unwrap()
     }
-    pub fn get_session_key(session: &Session) -> String {
-        format!("session::{}", session.id)
+    pub fn get_session_key(session_id: &str) -> String {
+        format!("session::{}", session_id)
     }
 
     pub fn get_user_sessions_key(user_id: &str) -> String {

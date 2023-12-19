@@ -43,7 +43,7 @@ impl SessionRepository {
         self.storage.hset(
             &Session::get_user_sessions_key(&session.user_id.to_string()),
             (
-                Session::get_session_key(&session).as_ref(),
+                Session::get_session_key(&session.id).as_ref(),
                 session.auth_provider.to_string(),
             ),
         )?;

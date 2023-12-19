@@ -112,7 +112,7 @@ impl UserService {
         // if provider(in case Google API) returns no refresh token, it has to check if user was logged in before
         // if No(refresh token is not in system) - it returns None and user has to relogin on provider(Google)
         let provider = UserProfile::get_provider(&user_profile);
-        if tokens.is_incompleted(&provider) {
+        if !tokens.is_completed(&provider) {
             log::debug!(
                 "\nUser profile: {:?} has incompleted tokens\n",
                 user_profile
@@ -172,8 +172,10 @@ impl UserService {
         response: &mut ResponseHead,
         session_id: String,
     ) -> Result<(), UserServiceError> {
-        Ok(self
-            .session_service
-            .set_session_cookie(response, session_id)?)
+        Ok(SessionService::set_cookie_session_id(
+            &self.session_service.config.cookie_config,
+            response,
+            session_id,
+        )?)
     }
 }

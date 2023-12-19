@@ -655,6 +655,7 @@ name = "cs-auth-service"
 version = "0.1.0"
 dependencies = [
  "actix-rt",
+ "actix-utils",
  "actix-web",
  "actix-web-thiserror",
  "actix-web-thiserror-derive",

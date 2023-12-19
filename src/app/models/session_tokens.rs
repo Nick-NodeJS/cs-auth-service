@@ -23,17 +23,18 @@ impl SessionTokens {
         }
         self.to_owned()
     }
-    pub fn is_incompleted(&self, provider: &AuthProviders) -> bool {
+    pub fn is_completed(&self, provider: &AuthProviders) -> bool {
         // At this time Google only has extra token but in case user logged in
         // and tries to login again(for example from another device) it returns
         // tokens without refresh token, so we need to be able check if tokens
         // are completed
         match provider {
-            AuthProviders::CyberSherlock => {
+            AuthProviders::Google => {
                 self.access_token.is_some()
                     && self.refresh_token.is_some()
                     && self.extra_token.is_some()
             }
+            // TODO: check if it's corect in next Auth Provider implementations
             _ => self.access_token.is_some() && self.refresh_token.is_some(),
         }
     }

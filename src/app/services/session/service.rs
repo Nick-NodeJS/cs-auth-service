@@ -1,7 +1,8 @@
 use actix_web::{
     cookie::{Cookie, CookieJar},
-    dev::ResponseHead,
+    dev::{ResponseHead, ServiceRequest},
     http::header::{HeaderValue, SET_COOKIE},
+    HttpRequest,
 };
 use bson::oid::ObjectId;
 
@@ -16,13 +17,13 @@ use crate::{
         },
         repositories::session::repository::SessionRepository,
     },
-    config::session_config::SessionConfig,
+    config::session_config::{CookieConfiguration, CookieContentSecurity, SessionConfig},
 };
 
 use super::error::SessionServiceError;
 
 pub struct SessionService {
-    config: SessionConfig,
+    pub config: SessionConfig,
     repository: SessionRepository,
 }
 
@@ -53,20 +54,20 @@ impl SessionService {
         new_session_data: NewSessionData,
     ) -> Result<Session, SessionServiceError> {
         let session = Session::new(new_session_data);
-        let session_key = Session::get_session_key(&session);
+        let session_key = Session::get_session_key(&session.id);
         self.repository
             .set_session(&session_key, &session, self.config.session_ttl_sec)
             .await?;
         Ok(session)
     }
 
-    pub fn set_session_cookie(
-        &self,
+    pub fn set_cookie_session_id(
+        config: &CookieConfiguration,
         response: &mut ResponseHead,
         session_id: String,
     ) -> Result<(), SessionServiceError> {
         // it should gets session cookie with encrypted session id
-        let config = &self.config.cookie_config;
+        // let config = &self.config.cookie_config;
         let mut cookie = Cookie::new(config.name.clone(), session_id);
 
         cookie.set_secure(config.secure);
@@ -93,5 +94,52 @@ impl SessionService {
         response.headers_mut().append(SET_COOKIE, val);
 
         Ok(())
+    }
+
+    pub fn get_cookie_session_id(
+        config: &CookieConfiguration,
+        request: &ServiceRequest,
+    ) -> Option<String> {
+        // it should gets session id from cookie
+        let cookies = match request.cookies().ok() {
+            Some(c) => c,
+            None => {
+                log::warn!("No cookies on request, ignoring...");
+
+                return None;
+            }
+        };
+        let session_cookie = match cookies.iter().find(|&cookie| cookie.name() == config.name) {
+            Some(c) => c,
+            None => {
+                log::warn!("No session cookie on request, ignoring...");
+
+                return None;
+            }
+        };
+
+        let mut jar = CookieJar::new();
+        jar.add_original(session_cookie.clone());
+
+        let verification_result = match config.content_security {
+            CookieContentSecurity::Signed => jar.signed(&config.key).get(&config.name),
+            CookieContentSecurity::Private => jar.private(&config.key).get(&config.name),
+        };
+
+        if verification_result.is_none() {
+            log::warn!(
+                "The session cookie attached to the incoming request failed to pass cryptographic \
+                checks (signature verification/decryption)."
+            );
+        }
+
+        match verification_result?.value().to_owned().try_into() {
+            Ok(session_key) => Some(session_key),
+            Err(_) => {
+                log::warn!("Invalid session key, ignoring...");
+
+                None
+            }
+        }
     }
 }

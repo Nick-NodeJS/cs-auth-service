@@ -8,6 +8,8 @@ use redis::{Commands, ToRedisArgs};
 use serde::{Serialize, Serializer};
 use serde_json::{json, Value};
 
+use crate::app::models::session::Session;
+use crate::app::services::traits::session_storage::SessionStorage;
 use crate::config::redis_config::RedisConfig;
 
 use super::error::CacheServiceError;
@@ -73,6 +75,12 @@ impl CacheService {
         Ok(result)
     }
 
+    pub fn get_value<T: FromRedisValue>(&self, key: &str) -> Result<Option<T>, CacheServiceError> {
+        let mut connection = self.get_connection()?;
+        let value: Option<T> = connection.get(key)?;
+        Ok(value)
+    }
+
     pub fn set_value_with_ttl<T>(
         &mut self,
         key: &str,
@@ -87,15 +95,6 @@ impl CacheService {
         Ok(())
     }
 
-    pub fn get_value<T: FromRedisValue>(
-        &mut self,
-        key: &str,
-    ) -> Result<Option<T>, CacheServiceError> {
-        let mut connection = self.get_connection()?;
-        let value: Option<T> = connection.get(key)?;
-        Ok(value)
-    }
-
     pub fn struct_to_cache_string<T: Serialize>(data: &T) -> Result<String, serde_json::Error> {
         serde_json::to_string::<T>(data)
     }
@@ -103,6 +102,12 @@ impl CacheService {
     fn get_connection(&self) -> Result<Connection, CacheServiceError> {
         let connection = self.client.get_connection()?;
         Ok(connection)
+    }
+}
+
+impl SessionStorage for CacheService {
+    fn load(&self, key: &str) -> Result<Option<Session>, CacheServiceError> {
+        self.get_value::<Session>(&Session::get_session_key(key).as_ref())
     }
 }
 

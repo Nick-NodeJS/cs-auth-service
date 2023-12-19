@@ -10,6 +10,7 @@ anyhow = "1.0"
 awc = "3.2.0"
 actix-rt = "2.9.0"
 actix-web = { version = "4.4.0", features = ["secure-cookies"]}
+actix-utils = "3.0.1"
 cs_shared_lib = { path = "./cs_shared_lib" }
 dotenv = "0.15.0"
 env_logger = "0.10.0"
