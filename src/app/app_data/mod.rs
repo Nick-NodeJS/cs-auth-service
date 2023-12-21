@@ -5,7 +5,7 @@ use super::{
     services::{google::service::GoogleService, user::service::UserService},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AppData {
     pub google_service: Arc<Mutex<GoogleService>>,
     pub user_service: Arc<Mutex<UserService>>,

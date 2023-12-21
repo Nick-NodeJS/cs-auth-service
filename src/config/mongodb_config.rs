@@ -2,7 +2,7 @@ use cs_shared_lib::validation::{is_valid_ipv4, validate_ip_port};
 use dotenv::dotenv;
 use serde::Deserialize;
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct MongoDBConfig {
     connection_uri_prefix: String,
     password: String,

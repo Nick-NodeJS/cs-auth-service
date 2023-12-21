@@ -1,15 +1,20 @@
 use actix_web::{web, HttpResponse};
+use serde_json::json;
 
-use crate::app::{app_data::AppData, app_error::AppError};
+use crate::app::{app_data::AppData, app_error::AppError, models::session::Session};
 
-pub async fn logout(app_data: web::Data<AppData>) -> Result<HttpResponse, AppError> {
-    // TODO: logout on provider and then(revoke token)
-    // remove all user sessions for the session provider
-    // - get session_token from cookie
-    // - decode cookie to get session_key
-    // - get session by session_key
-    // - logout on session provider
-    // - remove all session's provider sessions on session's user
-    // - update user session key array in cache
-    Ok(HttpResponse::Ok().body("Google logout"))
+pub async fn logout(
+    app_data: web::Data<AppData>,
+    session: Session,
+) -> Result<HttpResponse, AppError> {
+    // dbg!("User session from request:", &session);
+    if !session.is_anonymous() {
+        match session.auth_provider {
+            // TODO: on every auth_provider option implement logout and execut it here
+            _ => {}
+        }
+        let mut user_service = app_data.user_service.lock()?;
+        user_service.logout_by_session(session).await?;
+    }
+    Ok(HttpResponse::Ok().json(json!({"result": "successful"})))
 }

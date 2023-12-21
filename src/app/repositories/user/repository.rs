@@ -11,6 +11,7 @@ use crate::config::user_config::UserConfig;
 
 use super::error::UserRepositoryError;
 
+#[derive(Debug)]
 pub struct UserRepository {
     config: UserConfig,
     collection: String,
