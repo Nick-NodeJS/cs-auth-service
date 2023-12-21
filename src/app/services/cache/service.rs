@@ -37,23 +37,6 @@ impl CacheService {
         Ok(CacheService { client })
     }
 
-    // pub fn transaction(&mut self, key: &str, value: &str) -> Result<(), CacheServiceError> {
-    //     let mut connection = self.get_connection()?;
-    //     let command = redis::transaction(&mut connection, &[key], |con, pipe| {
-    //         pipe.cmd("MULTI")
-    //             .cmd("RPUSH")
-    //             .arg("u.sess")
-    //             .arg("google::1")
-    //             .cmd("RPUSH")
-    //             .arg("u.sess")
-    //             .arg("google::2")
-    //             .cmd("EXEC")
-    //             .query::<String>(con);
-    //         Ok(Some(()))
-    //     })?;
-    //     Ok(())
-    // }
-
     pub fn hset(&mut self, key: &str, items: (&str, String)) -> Result<(), CacheServiceError> {
         let mut connection = self.get_connection()?;
         connection.hset(key, items.0, items.1)?;
@@ -110,12 +93,3 @@ impl SessionStorage for CacheService {
         self.get_value::<Session>(&Session::get_session_key(key).as_ref())
     }
 }
-
-// TODO: investigate how to implement Debug for Redis Service
-// impl fmt::Debug for RedisService {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         f.debug_struct("RedisService")
-//             .field("Client ", &self.client)  // Replace with the actual field
-//             .finish()
-//     }
-// }

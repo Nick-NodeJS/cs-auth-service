@@ -6,6 +6,8 @@ use crate::config::mongodb_config::MongoDBConfig;
 use super::error::StorageServiceError;
 
 pub trait CollectionType {}
+
+#[derive(Debug)]
 pub struct StorageService {
     pub config: MongoDBConfig,
     database: Database,

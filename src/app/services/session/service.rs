@@ -2,7 +2,6 @@ use actix_web::{
     cookie::{Cookie, CookieJar},
     dev::{ResponseHead, ServiceRequest},
     http::header::{HeaderValue, SET_COOKIE},
-    HttpRequest,
 };
 use bson::oid::ObjectId;
 
@@ -11,17 +10,18 @@ use crate::{
         models::{
             common::AuthProviders,
             session::{NewSessionData, Session},
-            session_metadata::SessionMetadata,
-            session_tokens::SessionTokens,
-            user::User,
         },
         repositories::session::repository::SessionRepository,
     },
-    config::session_config::{CookieConfiguration, CookieContentSecurity, SessionConfig},
+    config::{
+        cookie_config::{CookieConfiguration, CookieContentSecurity},
+        session_config::SessionConfig,
+    },
 };
 
 use super::error::SessionServiceError;
 
+#[derive(Debug)]
 pub struct SessionService {
     pub config: SessionConfig,
     repository: SessionRepository,
@@ -59,6 +59,11 @@ impl SessionService {
             .set_session(&session_key, &session, self.config.session_ttl_sec)
             .await?;
         Ok(session)
+    }
+
+    pub async fn remove_sessions(&self, sessions: Vec<Session>) -> Result<(), SessionServiceError> {
+        // TODO: remove sessions and update user sessions cache set
+        Ok(())
     }
 
     pub fn set_cookie_session_id(

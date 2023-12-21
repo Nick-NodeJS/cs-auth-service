@@ -1,7 +1,7 @@
 use dotenv::dotenv;
 use serde::Deserialize;
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct UserConfig {
     pub user_cache_ttl_sec: u32,
 }

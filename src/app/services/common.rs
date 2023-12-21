@@ -53,11 +53,12 @@ pub async fn async_http_request(
         result_string = "Success";
     }
     log::debug!(
-        "\n{}!!! Request\n{:?} \nExecution\n start: {}\nfinish: {}\nResponse body:\n{:?}\n",
+        "\n{}!!! \nRequest: {:?} \nExecution\n start: {}\nfinish: {}\nResponse body: {:?}\n, body as string: {}",
         result_string,
         request,
         &start,
         &finish,
+        &response.body,
         String::from_utf8_lossy(&response.body)
     );
     Ok(response)

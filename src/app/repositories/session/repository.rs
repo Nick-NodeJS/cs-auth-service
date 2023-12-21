@@ -2,6 +2,7 @@ use crate::app::{models::session::Session, services::cache::service::CacheServic
 
 use super::error::SessionRepositoryError;
 
+#[derive(Debug)]
 pub struct SessionRepository {
     storage: CacheService,
 }

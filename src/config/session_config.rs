@@ -1,37 +1,10 @@
-use actix_web::cookie::{time::Duration, Key, SameSite};
+use actix_web::cookie::{Key, SameSite};
 use cs_shared_lib::validation::validate_integer_in_range;
 use dotenv::dotenv;
-use serde::Deserialize;
 
-#[derive(Debug, Clone, Copy)]
-pub enum CookieContentSecurity {
-    /// The cookie content is encrypted when using `CookieContentSecurity::Private`.
-    ///
-    /// Encryption guarantees confidentiality and integrity: the client cannot tamper with the
-    /// cookie content nor decode it, as long as the encryption key remains confidential.
-    Private,
+use super::cookie_config::{CookieConfiguration, CookieContentSecurity};
 
-    /// The cookie content is signed when using `CookieContentSecurity::Signed`.
-    ///
-    /// Signing guarantees integrity, but it doesn't ensure confidentiality: the client cannot
-    /// tamper with the cookie content, but they can read it.
-    Signed,
-}
-
-#[derive(Clone)]
-pub struct CookieConfiguration {
-    pub secure: bool,
-    pub http_only: bool,
-    pub name: String,
-    pub same_site: SameSite,
-    pub path: String,
-    pub domain: Option<String>,
-    pub max_age: Option<Duration>,
-    pub content_security: CookieContentSecurity,
-    pub key: Key,
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SessionConfig {
     pub cookie_config: CookieConfiguration,
     pub session_ttl_sec: i64,

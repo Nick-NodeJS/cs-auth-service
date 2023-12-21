@@ -19,6 +19,7 @@ use crate::app::{
 
 use super::error::UserServiceError;
 
+#[derive(Debug)]
 pub struct UserService {
     session_service: SessionService,
     user_repository: UserRepository,
@@ -140,6 +141,7 @@ impl UserService {
                 // TODO: clone user session with the same token
                 let new_user_session = self
                     .set_new_session(NewSessionData {
+                        anonimous: false,
                         auth_provider: provider,
                         user_id: exiten_user.id,
                         tokens: user_session.tokens,
@@ -157,6 +159,7 @@ impl UserService {
             let user = self.create_user_with_profile(user_profile).await?;
             let session = self
                 .set_new_session(NewSessionData {
+                    anonimous: false,
                     auth_provider: provider,
                     user_id: user.id,
                     tokens: tokens,
@@ -177,5 +180,16 @@ impl UserService {
             response,
             session_id,
         )?)
+    }
+
+    pub async fn logout_by_session(&mut self, session: Session) -> Result<(), UserServiceError> {
+        let sessions_to_remove = self
+            .session_service
+            .get_sessions(session.user_id, session.auth_provider)
+            .await?;
+        self.session_service
+            .remove_sessions(sessions_to_remove)
+            .await?;
+        Ok(())
     }
 }

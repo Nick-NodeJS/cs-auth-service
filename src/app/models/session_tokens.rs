@@ -38,4 +38,11 @@ impl SessionTokens {
             _ => self.access_token.is_some() && self.refresh_token.is_some(),
         }
     }
+    pub fn empty_tokens() -> SessionTokens {
+        SessionTokens {
+            access_token: None,
+            refresh_token: None,
+            extra_token: None,
+        }
+    }
 }

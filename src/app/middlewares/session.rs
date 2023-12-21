@@ -4,6 +4,7 @@ use actix_utils::future::{ready, Ready};
 use actix_web::{
     body::MessageBody,
     dev::{forward_ready, ResponseHead, Service, ServiceRequest, ServiceResponse, Transform},
+    HttpMessage,
 };
 
 use crate::{
@@ -70,7 +71,7 @@ where
 
     forward_ready!(service);
 
-    fn call(&self, mut req: ServiceRequest) -> Self::Future {
+    fn call(&self, req: ServiceRequest) -> Self::Future {
         let service = Rc::clone(&self.service);
         let storage = Rc::clone(&self.storage);
         let configuration = Rc::clone(&self.configuration);
@@ -91,7 +92,8 @@ where
                         None
                     }
                 } {
-                    log::debug!("\nUser session: {session:#?}");
+                    // log::debug!("\nUser session: {session:#?}");
+                    req.extensions_mut().insert(session);
                 };
             };
 

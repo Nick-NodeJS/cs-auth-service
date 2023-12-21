@@ -1,10 +1,10 @@
-use actix_web::cookie::Cookie;
-use bson::{oid::ObjectId, serde_helpers::chrono_datetime_as_bson_datetime};
+use actix_utils::future::{ready, Ready};
+use actix_web::{dev::Payload, error::Error, FromRequest, HttpMessage, HttpRequest};
+use bson::oid::ObjectId;
 use chrono::{DateTime, Utc};
 use redis::{ErrorKind, FromRedisValue, RedisError, RedisResult, Value as RedisValue};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use uuid::Uuid;
 
 use std::convert::TryInto;
 
@@ -16,6 +16,7 @@ use super::{
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NewSessionData {
+    pub anonimous: bool,
     pub auth_provider: AuthProviders,
     pub user_id: ObjectId,
     pub tokens: SessionTokens,
@@ -24,6 +25,7 @@ pub struct NewSessionData {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Session {
+    anonimous: bool,
     pub auth_provider: AuthProviders,
     pub user_id: ObjectId,
     pub id: String,
@@ -37,6 +39,7 @@ impl Session {
     pub fn new(session_data: NewSessionData) -> Self {
         let now = Utc::now();
         Session {
+            anonimous: session_data.anonimous,
             auth_provider: session_data.auth_provider,
             user_id: session_data.user_id,
             // TODO: update session_id generation according to actix-web example
@@ -47,6 +50,11 @@ impl Session {
             updated_at: now,
         }
     }
+
+    pub fn is_anonymous(&self) -> bool {
+        self.anonimous
+    }
+
     pub fn generate_session_id() -> String {
         //format!("session::{}", session.session_id)
 
@@ -70,6 +78,25 @@ impl Session {
     pub fn get_user_sessions_key(user_id: &str) -> String {
         format!("user::sessions::{}", user_id)
     }
+
+    pub fn get_anonymous_session() -> Session {
+        Session::new(NewSessionData {
+            anonimous: true,
+            auth_provider: AuthProviders::CyberSherlock,
+            user_id: ObjectId::new(),
+            tokens: SessionTokens::empty_tokens(),
+            session_metadata: SessionMetadata::new(),
+        })
+    }
+
+    pub fn get_session_from_http_request(req: &HttpRequest) -> Session {
+        if let Some(session) = req.extensions_mut().get::<Session>() {
+            session.to_owned()
+        } else {
+            Session::get_anonymous_session()
+        }
+    }
+
     pub fn get_id_json(session: Session) -> Value {
         // it should use encrypted session_id(see actix-web example)
         json!({
@@ -88,5 +115,15 @@ impl FromRedisValue for Session {
                 format!("(response was {:?})", value),
             ))),
         }
+    }
+}
+
+impl FromRequest for Session {
+    type Error = Error;
+    type Future = Ready<Result<Session, Error>>;
+
+    #[inline]
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        ready(Ok(Session::get_session_from_http_request(&req)))
     }
 }
