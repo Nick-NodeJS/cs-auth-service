@@ -6,7 +6,7 @@ use redis::{
     Value as RedisValue,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 
 use crate::app::services::storage::service::CollectionType;
 
@@ -118,7 +118,6 @@ impl ToRedisArgs for User {
                 "cybersherlock": self.cybersherlock,
                 "google": self.google,
                 "facebook": self.facebook,
-                // TODO: check if we need more accurate precision
                 "created_at": self.created_at.to_string(),
                 "updated_at": self.updated_at.to_string(),
             })

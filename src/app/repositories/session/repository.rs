@@ -35,7 +35,7 @@ impl SessionRepository {
         session: &Session,
         session_ttl: i64,
     ) -> Result<(), SessionRepositoryError> {
-        // TODO: implement user sessions in cache array updating in parallel(in one step) with session set
+        // TODO: implement user sessions in cache array updating in parallel(in one step) with session setting
         self.storage.set_value_with_ttl::<String>(
             session_key,
             CacheService::struct_to_cache_string(&session)?,
@@ -48,6 +48,18 @@ impl SessionRepository {
                 session.auth_provider.to_string(),
             ),
         )?;
+        Ok(())
+    }
+    pub async fn remove_sessions(
+        &mut self,
+        user_sessions_key: &str,
+        session_keys: Vec<String>,
+    ) -> Result<(), SessionRepositoryError> {
+        dbg!(user_sessions_key, &session_keys);
+        // TODO: implement user sessions in cache array updating in parallel(in one step) with session deleting
+        self.storage.delete_values(session_keys.clone())?;
+        self.storage
+            .delete_hset_values(user_sessions_key, session_keys)?;
         Ok(())
     }
 }

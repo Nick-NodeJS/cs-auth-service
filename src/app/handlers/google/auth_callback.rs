@@ -1,5 +1,4 @@
 use actix_web::{
-    http::header::ContentType,
     web::{self},
     HttpRequest, HttpResponse,
 };
@@ -7,11 +6,8 @@ use actix_web::{
 use crate::app::{
     app_data::AppData,
     app_error::AppError,
-    models::{session::Session, user::UserProfile},
-    services::{
-        common::{error_as_json, result_as_json},
-        session::service::SessionService,
-    },
+    models::user::UserProfile,
+    services::common::{error_as_json, result_as_json},
 };
 
 pub async fn auth_callback(
@@ -27,6 +23,7 @@ pub async fn auth_callback(
     let tokens = google_service
         .get_tokens(code, login_cache_data.pkce_code_verifier)
         .await?;
+
     let user_profile = google_service
         .get_user_profile(tokens.access_token.clone())
         .await?;
@@ -39,13 +36,14 @@ pub async fn auth_callback(
         )
         .await?
     {
-        log::info!(
+        log::debug!(
             "User {} loged in with Google successfuly",
             user_session.user_id
         );
         // TODO: set session token to cookie
         let mut response = HttpResponse::Ok().json(result_as_json("success"));
         user_service.set_session_cookie(response.head_mut(), user_session.id)?;
+
         Ok(response)
     } else {
         log::warn!(

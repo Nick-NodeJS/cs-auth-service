@@ -81,9 +81,9 @@ pub struct LoginCacheData {
 }
 
 impl LoginCacheData {
-    pub fn to_string(&self) -> &str {
-        self.to_string()
-    }
+    // pub fn to_string(&self) -> &str {
+    //     self.to_string()
+    // }
 }
 impl FromRedisValue for LoginCacheData {
     fn from_redis_value(value: &RedisValue) -> RedisResult<LoginCacheData> {

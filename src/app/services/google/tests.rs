@@ -3,9 +3,7 @@ mod tests {
     use env_logger::Env;
     use jsonwebtoken::DecodingKey;
 
-    use crate::{
-        app::services::google::service::decode_token, config::google_config::GoogleConfig,
-    };
+    use crate::app::services::google::service::decode_token;
 
     #[test]
     /*

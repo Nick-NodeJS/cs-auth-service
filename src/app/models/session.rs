@@ -4,7 +4,6 @@ use bson::oid::ObjectId;
 use chrono::{DateTime, Utc};
 use redis::{ErrorKind, FromRedisValue, RedisError, RedisResult, Value as RedisValue};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 
 use std::convert::TryInto;
 
@@ -56,8 +55,6 @@ impl Session {
     }
 
     pub fn generate_session_id() -> String {
-        //format!("session::{}", session.session_id)
-
         // Session key generation routine that follows [OWASP recommendations].
         //
         // [OWASP recommendations]: https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#session-id-entropy
@@ -95,13 +92,6 @@ impl Session {
         } else {
             Session::get_anonymous_session()
         }
-    }
-
-    pub fn get_id_json(session: Session) -> Value {
-        // it should use encrypted session_id(see actix-web example)
-        json!({
-            "session": session.id
-        })
     }
 }
 
