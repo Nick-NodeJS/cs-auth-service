@@ -6,8 +6,6 @@ mod models;
 mod repositories;
 mod services;
 
-use std::sync::{Arc, Mutex};
-
 use actix_web::{middleware::Logger, web, App, HttpServer};
 
 use crate::app::app_data::AppData;

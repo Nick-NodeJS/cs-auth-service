@@ -298,6 +298,15 @@ impl GoogleService {
         }
     }
 
+    pub async fn logout(&self, tokens: SessionTokens) -> Result<(), GoogleServiceError> {
+        if let Some(token) = tokens.refresh_token {
+            self.revoke_token(token.token_string.as_ref()).await
+        } else {
+            log::error!("Google logout error. No refresh token");
+            Err(GoogleServiceError::BadTokenStructure)
+        }
+    }
+
     pub async fn revoke_token(&self, token: &str) -> Result<(), GoogleServiceError> {
         let mut url = Url::parse(&self.config.google_revoke_url).expect("parse url error");
         url.set_query(Some(format!("token={}", token.clone()).as_ref()));

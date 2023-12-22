@@ -2,11 +2,9 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 
-use chrono::{DateTime, Utc};
-use redis::{Client, Connection, FromRedisValue};
+use redis::{Client, Cmd, Connection, FromRedisValue};
 use redis::{Commands, ToRedisArgs};
-use serde::{Serialize, Serializer};
-use serde_json::{json, Value};
+use serde::Serialize;
 
 use crate::app::models::session::Session;
 use crate::app::services::traits::session_storage::SessionStorage;
@@ -75,6 +73,32 @@ impl CacheService {
     {
         let mut connection = self.get_connection()?;
         connection.set_ex(key, value, seconds)?;
+        Ok(())
+    }
+
+    pub fn delete_values(&mut self, keys: Vec<String>) -> Result<(), CacheServiceError> {
+        let mut connection = self.get_connection()?;
+        let mut cmd = Cmd::new();
+        cmd.arg("DEL");
+        for key in keys {
+            cmd.arg(&key);
+        }
+        cmd.query(&mut connection)?;
+        Ok(())
+    }
+
+    pub fn delete_hset_values(
+        &mut self,
+        hset_key: &str,
+        keys: Vec<String>,
+    ) -> Result<(), CacheServiceError> {
+        let mut connection = self.get_connection()?;
+        let mut cmd = Cmd::new();
+        cmd.arg("HDEL").arg(hset_key);
+        for key in keys {
+            cmd.arg(&key);
+        }
+        cmd.query(&mut connection)?;
         Ok(())
     }
 

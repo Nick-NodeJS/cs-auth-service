@@ -3,7 +3,6 @@ use bson::oid::ObjectId;
 
 use crate::app::{
     models::{
-        common::AuthProviders,
         session::{NewSessionData, Session},
         session_metadata::SessionMetadata,
         session_tokens::SessionTokens,
@@ -183,12 +182,8 @@ impl UserService {
     }
 
     pub async fn logout_by_session(&mut self, session: Session) -> Result<(), UserServiceError> {
-        let sessions_to_remove = self
-            .session_service
-            .get_sessions(session.user_id, session.auth_provider)
-            .await?;
         self.session_service
-            .remove_sessions(sessions_to_remove)
+            .remove_sessions_by_session(session)
             .await?;
         Ok(())
     }

@@ -1,4 +1,3 @@
-use actix_web::http::Error;
 use awc::error::HeaderValue;
 use chrono::Utc;
 use oauth2::reqwest;

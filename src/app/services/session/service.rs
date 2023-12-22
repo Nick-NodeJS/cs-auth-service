@@ -61,8 +61,20 @@ impl SessionService {
         Ok(session)
     }
 
-    pub async fn remove_sessions(&self, sessions: Vec<Session>) -> Result<(), SessionServiceError> {
-        // TODO: remove sessions and update user sessions cache set
+    pub async fn remove_sessions_by_session(
+        &mut self,
+        session: Session,
+    ) -> Result<(), SessionServiceError> {
+        let user_sessions_key = Session::get_user_sessions_key(&session.user_id.to_string());
+        let user_sessions = self.repository.get_sessions(&user_sessions_key).await?;
+        let session_keys_to_remove: Vec<String> = user_sessions
+            .into_iter()
+            .filter(|s| s.auth_provider.is_equal(&session.auth_provider))
+            .map(|s| Session::get_session_key(&s.id))
+            .collect();
+        self.repository
+            .remove_sessions(&user_sessions_key, session_keys_to_remove)
+            .await?;
         Ok(())
     }
 

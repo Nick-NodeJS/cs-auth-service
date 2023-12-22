@@ -3,15 +3,12 @@ use std::{future::Future, pin::Pin, rc::Rc};
 use actix_utils::future::{ready, Ready};
 use actix_web::{
     body::MessageBody,
-    dev::{forward_ready, ResponseHead, Service, ServiceRequest, ServiceResponse, Transform},
+    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     HttpMessage,
 };
 
 use crate::{
-    app::services::{
-        cache::service::CacheService, session::service::SessionService, storage,
-        traits::session_storage::SessionStorage,
-    },
+    app::services::{session::service::SessionService, traits::session_storage::SessionStorage},
     config::session_config::SessionConfig,
 };
 
@@ -92,7 +89,6 @@ where
                         None
                     }
                 } {
-                    // log::debug!("\nUser session: {session:#?}");
                     req.extensions_mut().insert(session);
                 };
             };
