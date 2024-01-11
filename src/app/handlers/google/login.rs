@@ -2,7 +2,10 @@ use crate::app::{
     app_data::AppData,
     app_error::AppError,
     models::session_metadata::SessionMetadata,
-    services::{common::auth_url_as_json, google::structures::LoginCacheData},
+    services::{
+        cache::service::RedisCacheService, common::auth_url_as_json,
+        google::structures::LoginCacheData,
+    },
 };
 use actix_web::{web, HttpRequest, HttpResponse};
 

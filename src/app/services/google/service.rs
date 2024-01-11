@@ -1,5 +1,4 @@
 use chrono::{DateTime, Duration, Utc};
-use derivative::Derivative;
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -21,8 +20,8 @@ use oauth2::{
 use crate::app::models::session_tokens::SessionTokens;
 use crate::app::models::token::Token;
 use crate::app::models::user::GoogleProfile;
-use crate::app::services::cache::service::{CacheService, CacheServiceType};
-use crate::app::services::common::{async_http_request, get_x_www_form_headers};
+use crate::app::services::cache::service::RedisCacheService;
+use crate::app::services::common::{async_http_request, get_x_www_form_headers, AsyncFn};
 use crate::app::services::google::structures::GoogleTokenResponse;
 use crate::config::google_config::GoogleConfig;
 
@@ -31,50 +30,27 @@ use super::structures::{
     GoogleCert, GoogleKeys, LoginCacheData, TokenClaims, TokenHeaderObject, UserInfo,
 };
 
-#[derive(Derivative)]
-#[derivative(Debug)]
 pub struct GoogleService {
-    oauth2_client: BasicClient,
-    cache_service: CacheService,
+    async_http_request: Box<dyn AsyncFn>,
+    cache_service: RedisCacheService,
     config: GoogleConfig,
 }
 
 impl GoogleService {
-    pub async fn new() -> Result<Self, GoogleServiceError> {
-        let cache_service = CacheService::new(CacheServiceType::Google)?;
-        let config = GoogleConfig::new();
-        let google_client_id = ClientId::new(config.google_client_id.to_string());
-        let google_client_secret = ClientSecret::new(config.google_client_secret.to_string());
-        let oauth_url = AuthUrl::new(config.google_oauth_url.to_string())
-            .expect("Invalid authorization endpoint URL");
-        let token_url =
-            TokenUrl::new(config.google_token_url.to_string()).expect("Invalid token endpoint URL");
-
-        // Set up the config for the Google OAuth2 process.
-        let client = BasicClient::new(
-            google_client_id,
-            Some(google_client_secret),
-            oauth_url,
-            Some(token_url),
-        )
-        .set_redirect_uri(
-            RedirectUrl::new(config.google_redirect_url.to_string()).expect("Invalid redirect URL"),
-        )
-        // Google supports OAuth 2.0 Token Revocation (RFC-7009)
-        .set_revocation_uri(
-            RevocationUrl::new(config.google_revoke_url.to_string())
-                .expect("Invalid revocation endpoint URL"),
-        );
-
-        Ok(GoogleService {
-            oauth2_client: client,
+    pub fn new(
+        request: Box<dyn AsyncFn>,
+        config: GoogleConfig,
+        cache_service: RedisCacheService,
+    ) -> Self {
+        GoogleService {
+            async_http_request: request,
             cache_service,
             config,
-        })
+        }
     }
 
     pub async fn init(&mut self) -> Result<(), GoogleServiceError> {
-        // get Google certificates
+        // check Google certificates
         let _ = self.get_certificates().await?;
         Ok(())
     }
@@ -84,8 +60,7 @@ impl GoogleService {
         if let Some(certificates_from_cache) = self.get_certificates_from_cache().await? {
             return Ok(certificates_from_cache);
         }
-        let (google_certs, expires) =
-            get_google_oauth2_certificates(&self.config.google_cert_url).await?;
+        let (google_certs, expires) = self.get_google_oauth2_certificates().await?;
 
         self.set_certificates_to_cache(google_certs.clone(), expires)
             .await?;
@@ -97,8 +72,32 @@ impl GoogleService {
         // Google supports Proof Key for Code Exchange (PKCE - https://oauth.net/2/pkce/).
         // Create a PKCE code verifier and SHA-256 encode it as a code challenge.
         let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
-        let (authorize_url, csrf_state) = self
-            .oauth2_client
+
+        let google_client_id = ClientId::new(self.config.google_client_id.to_string());
+        let google_client_secret = ClientSecret::new(self.config.google_client_secret.to_string());
+        let oauth_url = AuthUrl::new(self.config.google_oauth_url.to_string())
+            .expect("Invalid authorization endpoint URL");
+        let token_url = TokenUrl::new(self.config.google_token_url.to_string())
+            .expect("Invalid token endpoint URL");
+
+        // Set up the config for the Google OAuth2 process.
+        let oauth2_client = BasicClient::new(
+            google_client_id,
+            Some(google_client_secret),
+            oauth_url,
+            Some(token_url),
+        )
+        .set_redirect_uri(
+            RedirectUrl::new(self.config.google_redirect_url.to_string())
+                .expect("Invalid redirect URL"),
+        )
+        // Google supports OAuth 2.0 Token Revocation (RFC-7009)
+        .set_revocation_uri(
+            RevocationUrl::new(self.config.google_revoke_url.to_string())
+                .expect("Invalid revocation endpoint URL"),
+        );
+
+        let (authorize_url, csrf_state) = oauth2_client
             .authorize_url(CsrfToken::new_random)
             // This is requesting access to the user's profile.
             .add_scope(Scope::new("openid".to_string()))
@@ -107,11 +106,12 @@ impl GoogleService {
             .add_extra_param("access_type", "offline")
             .set_pkce_challenge(pkce_code_challenge)
             .url();
-        return (
+
+        (
             authorize_url,
             csrf_state,
             pkce_code_verifier.secret().to_string(),
-        );
+        )
     }
 
     pub fn set_auth_data_to_cache(
@@ -121,8 +121,8 @@ impl GoogleService {
     ) -> Result<(), GoogleServiceError> {
         self.cache_service.set_value_with_ttl::<String>(
             csrf_state,
-            CacheService::struct_to_cache_string(login_cache_data)?,
-            self.config.google_cache_state_ttl_sec as usize,
+            RedisCacheService::struct_to_cache_string(login_cache_data)?,
+            self.config.google_cache_state_ttl_sec,
         )?;
         Ok(())
     }
@@ -340,8 +340,8 @@ impl GoogleService {
         let expired_duration = expires.signed_duration_since(now).num_seconds();
         self.cache_service.set_value_with_ttl(
             &self.config.google_cache_certs_key,
-            &serde_json::to_string(&certificates)?,
-            expired_duration as usize,
+            serde_json::to_string(&certificates)?,
+            expired_duration as u64,
         )?;
         Ok(())
     }
@@ -359,6 +359,37 @@ impl GoogleService {
             }
             None => Ok(None),
         }
+    }
+    async fn get_google_oauth2_certificates(
+        &mut self,
+    ) -> Result<(Vec<GoogleCert>, DateTime<Utc>), GoogleServiceError> {
+        let jwks_response = match self
+            .async_http_request
+            .handle(HttpRequest {
+                method: Method::GET,
+                url: Url::parse(self.config.google_cert_url.clone().as_ref())
+                    .expect("parse url error"),
+                headers: HeaderMap::new(),
+                body: vec![],
+            })
+            .await
+        {
+            Ok(response) => response,
+            Err(_) => {
+                return Err(GoogleServiceError::OAuth2CertificatesResponse);
+            }
+        };
+
+        let cert_expires = match jwks_response.headers.get("expires") {
+            Some(value) => value.to_str()?,
+            None => return Err(GoogleServiceError::OAuth2CertificatesResponse),
+        };
+        let cert_expires_datetime: DateTime<Utc> =
+            DateTime::parse_from_rfc2822(cert_expires)?.into();
+
+        let jwt_keys = serde_json::from_slice::<GoogleKeys>(&jwks_response.body)?;
+
+        Ok((jwt_keys.keys, cert_expires_datetime))
     }
 }
 
@@ -404,34 +435,6 @@ pub fn decode_token(
     };
 
     Ok(token_data.claims)
-}
-
-async fn get_google_oauth2_certificates(
-    cert_url: &str,
-) -> Result<(Vec<GoogleCert>, DateTime<Utc>), GoogleServiceError> {
-    let jwks_response = match async_http_request(HttpRequest {
-        method: Method::GET,
-        url: Url::parse(cert_url).expect("parse url error"),
-        headers: HeaderMap::new(),
-        body: vec![],
-    })
-    .await
-    {
-        Ok(response) => response,
-        Err(_) => {
-            return Err(GoogleServiceError::OAuth2CertificatesResponse);
-        }
-    };
-
-    let cert_expires = match jwks_response.headers.get("expires") {
-        Some(value) => value.to_str()?,
-        None => return Err(GoogleServiceError::OAuth2CertificatesResponse),
-    };
-    let cert_expires_datetime: DateTime<Utc> = DateTime::parse_from_rfc2822(cert_expires)?.into();
-
-    let jwt_keys = serde_json::from_slice::<GoogleKeys>(&jwks_response.body)?;
-
-    Ok((jwt_keys.keys, cert_expires_datetime))
 }
 
 pub fn get_decoding_key_from_vec_cert(

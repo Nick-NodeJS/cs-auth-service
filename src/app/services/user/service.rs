@@ -1,19 +1,21 @@
 use actix_web::dev::ResponseHead;
 use bson::oid::ObjectId;
 
-use crate::app::{
-    models::{
-        session::{NewSessionData, Session},
-        session_metadata::SessionMetadata,
-        session_tokens::SessionTokens,
-        user::{User, UserProfile},
+use crate::{
+    app::{
+        models::{
+            session::{NewSessionData, Session},
+            session_metadata::SessionMetadata,
+            session_tokens::SessionTokens,
+            user::{User, UserProfile},
+        },
+        repositories::user::repository::UserRepository,
+        services::{
+            cache::service::RedisCacheService, session::service::SessionService,
+            storage::service::StorageService,
+        },
     },
-    repositories::{session::repository::SessionRepository, user::repository::UserRepository},
-    services::{
-        cache::service::{CacheService, CacheServiceType},
-        session::service::SessionService,
-        storage::service::StorageService,
-    },
+    config::{session_config::SessionConfig, user_config::UserConfig},
 };
 
 use super::error::UserServiceError;
@@ -25,16 +27,20 @@ pub struct UserService {
 }
 
 impl UserService {
-    pub async fn new() -> Result<Self, UserServiceError> {
-        let storage_service = StorageService::new().await?;
-        let user_cache_service = CacheService::new(CacheServiceType::User)?;
+    pub async fn new(
+        config: UserConfig,
+        storage_service: StorageService,
+        user_cache_service: RedisCacheService,
+        session_cache_service: RedisCacheService,
+    ) -> Result<Self, UserServiceError> {
         let user_repository = UserRepository::new(
             storage_service.config.user_collection.clone(),
             user_cache_service,
+            config,
             storage_service,
         );
-        let session_cache_service = CacheService::new(CacheServiceType::Session)?;
-        let session_service = SessionService::new(SessionRepository::new(session_cache_service));
+        let session_config = SessionConfig::new();
+        let session_service = SessionService::new(session_config, session_cache_service);
         Ok(UserService {
             session_service,
             user_repository,

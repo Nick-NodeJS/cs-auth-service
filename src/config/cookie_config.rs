@@ -2,6 +2,7 @@ use std::fmt;
 
 use actix_web::cookie::{time::Duration, Key, SameSite};
 
+//#[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 pub enum CookieContentSecurity {
     /// The cookie content is encrypted when using `CookieContentSecurity::Private`.

@@ -5,6 +5,7 @@ use crate::app::{
     app_data::AppData,
     app_error::AppError,
     models::{common::AuthProviders, session::Session},
+    services::cache::service::RedisCacheService,
 };
 
 pub async fn logout(

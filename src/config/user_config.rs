@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct UserConfig {
-    pub user_cache_ttl_sec: u32,
+    pub user_cache_ttl_sec: u64,
 }
 
 impl UserConfig {

@@ -11,7 +11,8 @@ use actix_web::{middleware::Logger, web, App, HttpServer};
 use crate::app::app_data::AppData;
 use crate::app::handlers::logout::logout;
 use crate::app::middlewares::session::SessionMiddleware;
-use crate::app::services::cache::service::{CacheService, CacheServiceType};
+use crate::app::services::cache::common::CacheServiceType;
+use crate::app::services::cache::service::RedisCacheService;
 use crate::config::app_config::AppConfig;
 use crate::config::session_config::SessionConfig;
 use env_logger::Env;
@@ -44,7 +45,7 @@ pub async fn run() -> std::io::Result<()> {
         Err(err) => panic!("Error to create AppData: {:?}", err),
     };
 
-    let session_cache_service = CacheService::new(CacheServiceType::Session)
+    let session_cache_service = RedisCacheService::new(CacheServiceType::Session)
         .expect("Unable to create CacheService for Session Middleware");
 
     HttpServer::new(move || {
@@ -52,16 +53,21 @@ pub async fn run() -> std::io::Result<()> {
             .wrap(Logger::default())
             .app_data(web::Data::new(app_data.clone()))
             .service(
-                web::scope(format!("/api/{}", app_config.api_version).as_ref())
+                web::scope("/api")
                     .service(
-                        web::scope("/auth")
-                            .route("/google/login", web::get().to(login_with_google))
-                            .route("/google/callback", web::get().to(google_auth_callback))
-                            .wrap(SessionMiddleware::new(
-                                session_cache_service.clone(),
-                                SessionConfig::new(),
-                            ))
-                            .route("/logout", web::get().to(logout)),
+                        web::scope("/v1").service(
+                            web::scope("/auth")
+                                .service(
+                                    web::scope("/google")
+                                        .route("/login", web::get().to(login_with_google))
+                                        .route("/callback", web::get().to(google_auth_callback)),
+                                )
+                                .wrap(SessionMiddleware::new(
+                                    session_cache_service.clone(),
+                                    SessionConfig::new(),
+                                ))
+                                .route("/logout", web::get().to(logout)),
+                        ),
                     )
                     .route("/status", web::get().to(status)), // .service(
                                                               //     web::scope("/users")

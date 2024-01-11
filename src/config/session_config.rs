@@ -7,7 +7,7 @@ use super::cookie_config::{CookieConfiguration, CookieContentSecurity};
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
     pub cookie_config: CookieConfiguration,
-    pub session_ttl_sec: i64,
+    pub session_ttl_sec: u64,
 }
 
 impl SessionConfig {

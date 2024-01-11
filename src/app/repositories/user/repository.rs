@@ -5,7 +5,7 @@ use mongodb::bson::{self, doc};
 use mongodb::Collection;
 
 use crate::app::models::user::{User, UserProfile};
-use crate::app::services::cache::service::CacheService;
+use crate::app::services::cache::service::RedisCacheService;
 use crate::app::services::storage::service::StorageService;
 use crate::config::user_config::UserConfig;
 
@@ -15,13 +15,18 @@ use super::error::UserRepositoryError;
 pub struct UserRepository {
     config: UserConfig,
     collection: String,
-    cache: CacheService,
+    cache: RedisCacheService,
     storage: StorageService,
 }
 
+//#[allow(unused)]
 impl UserRepository {
-    pub fn new(collection: String, cache: CacheService, storage: StorageService) -> Self {
-        let config = UserConfig::new();
+    pub fn new(
+        collection: String,
+        cache: RedisCacheService,
+        config: UserConfig,
+        storage: StorageService,
+    ) -> Self {
         UserRepository {
             config,
             collection,
@@ -112,7 +117,7 @@ impl UserRepository {
         self.cache.set_value_with_ttl::<User>(
             &User::get_user_cache_key(user.id.to_string().as_ref()),
             user,
-            self.config.user_cache_ttl_sec as usize,
+            self.config.user_cache_ttl_sec,
         )?;
         Ok(())
     }

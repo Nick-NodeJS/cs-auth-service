@@ -7,7 +7,10 @@ use crate::app::{
     app_data::AppData,
     app_error::AppError,
     models::user::UserProfile,
-    services::common::{error_as_json, result_as_json},
+    services::{
+        cache::service::RedisCacheService,
+        common::{error_as_json, result_as_json},
+    },
 };
 
 pub async fn auth_callback(
