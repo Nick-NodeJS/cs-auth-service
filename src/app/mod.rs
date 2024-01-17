@@ -1,10 +1,11 @@
-mod app_data;
-mod app_error;
-mod handlers;
-mod middlewares;
-mod models;
-mod repositories;
-mod services;
+pub mod app_data;
+pub mod app_error;
+pub mod handlers;
+pub mod middlewares;
+pub mod models;
+pub mod repositories;
+pub mod services;
+// pub mod tests;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
 

@@ -13,8 +13,6 @@ use crate::config::redis_config::RedisConfig;
 use super::common::CacheServiceType;
 use super::error::CacheServiceError;
 
-use mockall::automock;
-
 #[derive(Clone, Debug)]
 pub struct RedisCacheService {
     pub client: Client,

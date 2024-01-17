@@ -9,6 +9,7 @@ pub enum CacheServiceError {
 
 impl From<RedisError> for CacheServiceError {
     fn from(err: RedisError) -> Self {
+        println!("RedisError: {:?}", err);
         log::debug!("RedisError: {:?}", err);
         return CacheServiceError::RedisError;
     }

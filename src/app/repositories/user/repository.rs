@@ -21,15 +21,10 @@ pub struct UserRepository {
 
 //#[allow(unused)]
 impl UserRepository {
-    pub fn new(
-        collection: String,
-        cache: RedisCacheService,
-        config: UserConfig,
-        storage: StorageService,
-    ) -> Self {
+    pub fn new(cache: RedisCacheService, config: UserConfig, storage: StorageService) -> Self {
         UserRepository {
             config,
-            collection,
+            collection: storage.config.user_collection.clone(),
             cache,
             storage,
         }
@@ -89,7 +84,8 @@ impl UserRepository {
     }
 
     pub async fn insert_user(&mut self, user: User) -> Result<(), UserRepositoryError> {
-        self.get_collection().insert_one(user.clone(), None).await?;
+        let result = self.get_collection().insert_one(user.clone(), None).await?;
+        println!("Inserted result {:?}", result);
         self.set_user_in_cache(user)?;
         Ok(())
     }
@@ -102,15 +98,23 @@ impl UserRepository {
         &mut self,
         user_id: ObjectId,
     ) -> Result<Option<User>, UserRepositoryError> {
-        let user = match self
+        let user_r = self
             .cache
-            .get_value::<User>(&User::get_user_cache_key(user_id.to_string().as_ref()))?
-        {
-            Some(user_string) => user_string,
-            None => return Ok(None),
+            .get_value::<User>(&User::get_user_cache_key(user_id.to_string().as_ref()));
+        let user = match user_r {
+            Ok(user_string) => user_string,
+            Err(err) => {
+                println!("ERROR: {}", err);
+                return Ok(None);
+            }
         };
+        Ok(user)
+        // let user = match user_r {
+        //     Some(user_string) => user_string,
+        //     None => return Ok(None),
+        // };
 
-        Ok(Some(user))
+        //Ok(Some(user))
     }
 
     fn set_user_in_cache(&mut self, user: User) -> Result<(), UserRepositoryError> {
@@ -119,6 +123,18 @@ impl UserRepository {
             user,
             self.config.user_cache_ttl_sec,
         )?;
+        Ok(())
+    }
+
+    pub async fn delete_by_id(&mut self, user_id: ObjectId) -> Result<(), UserRepositoryError> {
+        self.get_collection()
+            .delete_one(
+                UserRepository::get_find_user_by_id_query(user_id.clone()),
+                None,
+            )
+            .await?;
+        let key = User::get_user_cache_key(user_id.to_string().as_ref());
+        self.cache.delete_values(vec![key])?;
         Ok(())
     }
 

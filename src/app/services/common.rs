@@ -1,5 +1,3 @@
-use std::pin::Pin;
-
 use awc::error::HeaderValue;
 use chrono::Utc;
 use futures::future::BoxFuture;

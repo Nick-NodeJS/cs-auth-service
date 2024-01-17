@@ -33,12 +33,7 @@ impl UserService {
         user_cache_service: RedisCacheService,
         session_cache_service: RedisCacheService,
     ) -> Result<Self, UserServiceError> {
-        let user_repository = UserRepository::new(
-            storage_service.config.user_collection.clone(),
-            user_cache_service,
-            config,
-            storage_service,
-        );
+        let user_repository = UserRepository::new(user_cache_service, config, storage_service);
         let session_config = SessionConfig::new();
         let session_service = SessionService::new(session_config, session_cache_service);
         Ok(UserService {

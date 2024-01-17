@@ -3,7 +3,7 @@ mod tests {
     use env_logger::Env;
     use jsonwebtoken::DecodingKey;
 
-    use crate::app::services::google::service::decode_token;
+    use crate::app::services::google::service::decode_token as google_service_decode_token;
 
     #[test]
     /*
@@ -12,7 +12,7 @@ mod tests {
        The right option is the one which 'kid' is inside of token header
        Do not forget update Google Service to decode token properly
     */
-    fn test_google_token_decoding() {
+    fn decode_token() {
         // Set logger for all tests
         env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
 
@@ -28,7 +28,7 @@ mod tests {
 
         // need to disable expiration checking if token outdated
         // locally you can set fresh token + key and enable it
-        match decode_token(&token, &key, false) {
+        match google_service_decode_token(&token, &key, false) {
             Ok(token_data) => {
                 println!("Decoded token data: {:?}\n {}", token_data, token);
                 assert_eq!(token_data.aud, google_client_id);

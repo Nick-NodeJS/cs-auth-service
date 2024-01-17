@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub enum AuthProviders {
     CyberSherlock,
     Google,
@@ -27,5 +27,28 @@ impl FromStr for AuthProviders {
             "facebook" => Ok(AuthProviders::Facebook),
             _ => Err("Invalid AuthProvider"),
         }
+    }
+}
+
+pub mod datetime_as_mongo_bson {
+    use chrono::{DateTime, Utc};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(val: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let datetime = mongodb::bson::DateTime::from(val.to_owned());
+        datetime.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value: String = Deserialize::deserialize(deserializer)?;
+        value
+            .parse()
+            .map_err(|_| serde::de::Error::custom("Error parsing DateTime from string"))
     }
 }

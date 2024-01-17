@@ -1,5 +1,5 @@
 [package]
-name = "cs-auth-service"
+name = "cs_auth_service"
 version = "0.1.0"
 edition = "2021"
 
@@ -33,4 +33,7 @@ derivative = "2.2.0"
 uuid = { version = "1.6.1", feature = ["v4", "fast-rng"] }
 rand = "0.8.5"
 futures = "0.3.30"
-mockall = "0.12.1"
+
+# [[test]]
+# name = "test"
+# path = "tests/mod.rs"

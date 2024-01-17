@@ -1,7 +1,5 @@
 use std::sync::{Arc, Mutex};
 
-use actix_web::Handler;
-
 use crate::config::{google_config::GoogleConfig, user_config::UserConfig};
 
 use super::{
