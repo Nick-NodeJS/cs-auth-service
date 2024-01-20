@@ -6,13 +6,13 @@ use crate::app::services::cache::error::CacheServiceError;
 
 #[derive(Debug, Error)]
 pub enum UserRepositoryError {
-    #[error("MongoDB error")]
+    #[error("MongoDBError error")]
     MongoDBError,
 
     #[error("MongoDBBsonError error")]
     MongoDBBsonError,
 
-    #[error("MongoDB error")]
+    #[error("MongoDBBsonDeError error")]
     MongoDBBsonDeError,
 
     #[error("Redis error")]
@@ -43,6 +43,7 @@ impl From<MongoDBBsonError> for UserRepositoryError {
 
 impl From<mongodb::error::Error> for UserRepositoryError {
     fn from(err: mongodb::error::Error) -> Self {
+        println!("mongodb::error::Error: {:?}", err);
         log::debug!("mongodb::error::Error: {}", err);
         return UserRepositoryError::MongoDBError;
     }

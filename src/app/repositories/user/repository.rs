@@ -98,10 +98,10 @@ impl UserRepository {
         &mut self,
         user_id: ObjectId,
     ) -> Result<Option<User>, UserRepositoryError> {
-        let user_r = self
+        let try_user = self
             .cache
             .get_value::<User>(&User::get_user_cache_key(user_id.to_string().as_ref()));
-        let user = match user_r {
+        let user = match try_user {
             Ok(user_string) => user_string,
             Err(err) => {
                 println!("ERROR: {}", err);
@@ -109,12 +109,6 @@ impl UserRepository {
             }
         };
         Ok(user)
-        // let user = match user_r {
-        //     Some(user_string) => user_string,
-        //     None => return Ok(None),
-        // };
-
-        //Ok(Some(user))
     }
 
     fn set_user_in_cache(&mut self, user: User) -> Result<(), UserRepositoryError> {

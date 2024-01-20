@@ -58,17 +58,17 @@ impl UserProfile {
 pub struct User {
     #[serde(rename = "_id")]
     pub id: ObjectId,
-    active_profile: AuthProviders,
+    pub active_profile: AuthProviders,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    cybersherlock: Option<CyberSherlockProfile>,
+    pub cybersherlock: Option<CyberSherlockProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    google: Option<GoogleProfile>,
+    pub google: Option<GoogleProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    facebook: Option<FacebookProfile>,
+    pub facebook: Option<FacebookProfile>,
     #[serde(with = "datetime_as_mongo_bson")]
-    created_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
     #[serde(with = "datetime_as_mongo_bson")]
-    updated_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl User {
