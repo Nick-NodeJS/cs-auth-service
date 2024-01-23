@@ -12,7 +12,7 @@ pub struct GoogleConfig {
     pub google_redirect_url: String,
     pub google_userinfo_url: String,
     pub google_cert_url: String,
-    pub google_cache_state_ttl_sec: u32,
+    pub google_cache_state_ttl_sec: u64,
     pub google_cache_certs_key: String,
 }
 
@@ -39,7 +39,7 @@ impl GoogleConfig {
             .expect("Missing the GOOGLE_CERT_URL environment variable.");
         let google_cache_certs_key = dotenv::var("GOOGLE_CACHE_CERTS_KEY")
             .expect("Missing the GOOGLE_CACHE_CERTS_KEY environment variable.");
-        let google_cache_state_ttl_sec: u32 = dotenv::var("GOOGLE_STATE_CACHE_TTL_SEC")
+        let google_cache_state_ttl_sec: u64 = dotenv::var("GOOGLE_STATE_CACHE_TTL_SEC")
             .expect("GOOGLE_STATE_CACHE_TTL_SEC environment variable is not set")
             .parse()
             .expect("Invalid GOOGLE_STATE_CACHE_TTL_SEC");

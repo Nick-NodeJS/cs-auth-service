@@ -1,9 +1,9 @@
-mod app;
-mod config;
+pub mod app;
+pub mod config;
+pub mod tests;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
-    // fn main() -> () {
     if let Err(err) = app::run().await {
         println!("Error to start Auth Service: {:?}", err)
     }

@@ -5,7 +5,7 @@ use mongodb::bson::{self, doc};
 use mongodb::Collection;
 
 use crate::app::models::user::{User, UserProfile};
-use crate::app::services::cache::service::CacheService;
+use crate::app::services::cache::service::RedisCacheService;
 use crate::app::services::storage::service::StorageService;
 use crate::config::user_config::UserConfig;
 
@@ -15,16 +15,16 @@ use super::error::UserRepositoryError;
 pub struct UserRepository {
     config: UserConfig,
     collection: String,
-    cache: CacheService,
+    cache: RedisCacheService,
     storage: StorageService,
 }
 
+//#[allow(unused)]
 impl UserRepository {
-    pub fn new(collection: String, cache: CacheService, storage: StorageService) -> Self {
-        let config = UserConfig::new();
+    pub fn new(cache: RedisCacheService, config: UserConfig, storage: StorageService) -> Self {
         UserRepository {
             config,
-            collection,
+            collection: storage.config.user_collection.clone(),
             cache,
             storage,
         }
@@ -32,14 +32,12 @@ impl UserRepository {
 
     pub async fn find_user_by_id(
         &mut self,
-        user_id: ObjectId,
+        user_id: &ObjectId,
     ) -> Result<Option<User>, UserRepositoryError> {
-        if let Some(user) = self.get_user_from_cache(user_id)? {
+        if let Some(user) = self.get_user_by_id_from_cache(user_id)? {
             return Ok(Some(user));
         };
-        let filter = UserRepository::get_find_user_by_id_query(user_id);
-        let user = self.get_collection().find_one(filter, None).await?;
-        Ok(user)
+        self.get_user_by_id_from_storage(user_id).await
     }
 
     pub async fn find_user_by_profile(
@@ -58,7 +56,73 @@ impl UserRepository {
 
     pub async fn update_user(
         &mut self,
-        user_id: ObjectId,
+        user_id: &ObjectId,
+        data_to_update: Document,
+    ) -> Result<User, UserRepositoryError> {
+        let user = self.update_user_in_storage(user_id, data_to_update).await?;
+        self.set_user_in_cache(&user)?;
+        Ok(user)
+    }
+
+    pub async fn insert_user(&mut self, user: &User) -> Result<(), UserRepositoryError> {
+        self.insert_user_in_storage(user).await?;
+        self.set_user_in_cache(user)?;
+        Ok(())
+    }
+
+    pub async fn delete_by_id(&mut self, user_id: &ObjectId) -> Result<(), UserRepositoryError> {
+        self.delete_by_id_in_storage(user_id).await?;
+        self.delete_by_id_in_cache(user_id).await?;
+        Ok(())
+    }
+
+    fn get_collection(&self) -> Collection<User> {
+        self.storage.get_collection::<User>(&self.collection)
+    }
+
+    fn get_user_by_id_from_cache(
+        &mut self,
+        user_id: &ObjectId,
+    ) -> Result<Option<User>, UserRepositoryError> {
+        let try_user = self
+            .cache
+            .get_value::<User>(&User::get_user_cache_key(user_id.to_string().as_ref()));
+        let user = match try_user {
+            Ok(user_string) => user_string,
+            Err(err) => {
+                println!("ERROR: {}", err);
+                return Ok(None);
+            }
+        };
+        Ok(user)
+    }
+
+    fn set_user_in_cache(&mut self, user: &User) -> Result<(), UserRepositoryError> {
+        self.cache.set_value_with_ttl::<User>(
+            &User::get_user_cache_key(user.id.to_string().as_ref()),
+            user.to_owned(),
+            self.config.user_cache_ttl_sec,
+        )?;
+        Ok(())
+    }
+
+    async fn delete_by_id_in_cache(
+        &mut self,
+        user_id: &ObjectId,
+    ) -> Result<(), UserRepositoryError> {
+        let key = User::get_user_cache_key(user_id.to_string().as_ref());
+        self.cache.delete_values(vec![key])?;
+        Ok(())
+    }
+
+    async fn insert_user_in_storage(&self, user: &User) -> Result<(), UserRepositoryError> {
+        self.get_collection().insert_one(user, None).await?;
+        Ok(())
+    }
+
+    async fn update_user_in_storage(
+        &mut self,
+        user_id: &ObjectId,
         data_to_update: Document,
     ) -> Result<User, UserRepositoryError> {
         let filter = UserRepository::get_find_user_by_id_query(user_id);
@@ -71,7 +135,6 @@ impl UserRepository {
             )
             .await?
         {
-            self.set_user_in_cache(user.clone())?;
             Ok(user)
         } else {
             log::error!(
@@ -83,37 +146,19 @@ impl UserRepository {
         }
     }
 
-    pub async fn insert_user(&mut self, user: User) -> Result<(), UserRepositoryError> {
-        self.get_collection().insert_one(user.clone(), None).await?;
-        self.set_user_in_cache(user)?;
-        Ok(())
-    }
-
-    fn get_collection(&self) -> Collection<User> {
-        self.storage.get_collection::<User>(&self.collection)
-    }
-
-    fn get_user_from_cache(
-        &mut self,
-        user_id: ObjectId,
+    async fn get_user_by_id_from_storage(
+        &self,
+        user_id: &ObjectId,
     ) -> Result<Option<User>, UserRepositoryError> {
-        let user = match self
-            .cache
-            .get_value::<User>(&User::get_user_cache_key(user_id.to_string().as_ref()))?
-        {
-            Some(user_string) => user_string,
-            None => return Ok(None),
-        };
-
-        Ok(Some(user))
+        let filter = UserRepository::get_find_user_by_id_query(user_id);
+        let user = self.get_collection().find_one(filter, None).await?;
+        Ok(user)
     }
 
-    fn set_user_in_cache(&mut self, user: User) -> Result<(), UserRepositoryError> {
-        self.cache.set_value_with_ttl::<User>(
-            &User::get_user_cache_key(user.id.to_string().as_ref()),
-            user,
-            self.config.user_cache_ttl_sec as usize,
-        )?;
+    async fn delete_by_id_in_storage(&self, user_id: &ObjectId) -> Result<(), UserRepositoryError> {
+        self.get_collection()
+            .delete_one(UserRepository::get_find_user_by_id_query(user_id), None)
+            .await?;
         Ok(())
     }
 
@@ -162,7 +207,7 @@ impl UserRepository {
 
         query
     }
-    pub fn get_find_user_by_id_query(user_id: ObjectId) -> Document {
+    pub fn get_find_user_by_id_query(user_id: &ObjectId) -> Document {
         doc! {
             "_id": user_id
         }

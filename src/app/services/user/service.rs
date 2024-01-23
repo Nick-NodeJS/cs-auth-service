@@ -1,19 +1,21 @@
 use actix_web::dev::ResponseHead;
 use bson::oid::ObjectId;
 
-use crate::app::{
-    models::{
-        session::{NewSessionData, Session},
-        session_metadata::SessionMetadata,
-        session_tokens::SessionTokens,
-        user::{User, UserProfile},
+use crate::{
+    app::{
+        models::{
+            session::{NewSessionData, Session},
+            session_metadata::SessionMetadata,
+            session_tokens::SessionTokens,
+            user::{User, UserProfile},
+        },
+        repositories::user::repository::UserRepository,
+        services::{
+            cache::service::RedisCacheService, session::service::SessionService,
+            storage::service::StorageService,
+        },
     },
-    repositories::{session::repository::SessionRepository, user::repository::UserRepository},
-    services::{
-        cache::service::{CacheService, CacheServiceType},
-        session::service::SessionService,
-        storage::service::StorageService,
-    },
+    config::{session_config::SessionConfig, user_config::UserConfig},
 };
 
 use super::error::UserServiceError;
@@ -25,16 +27,15 @@ pub struct UserService {
 }
 
 impl UserService {
-    pub async fn new() -> Result<Self, UserServiceError> {
-        let storage_service = StorageService::new().await?;
-        let user_cache_service = CacheService::new(CacheServiceType::User)?;
-        let user_repository = UserRepository::new(
-            storage_service.config.user_collection.clone(),
-            user_cache_service,
-            storage_service,
-        );
-        let session_cache_service = CacheService::new(CacheServiceType::Session)?;
-        let session_service = SessionService::new(SessionRepository::new(session_cache_service));
+    pub async fn new(
+        config: UserConfig,
+        storage_service: StorageService,
+        user_cache_service: RedisCacheService,
+        session_cache_service: RedisCacheService,
+    ) -> Result<Self, UserServiceError> {
+        let user_repository = UserRepository::new(user_cache_service, config, storage_service);
+        let session_config = SessionConfig::new();
+        let session_service = SessionService::new(session_config, session_cache_service);
         Ok(UserService {
             session_service,
             user_repository,
@@ -62,17 +63,19 @@ impl UserService {
         user_profile: UserProfile,
     ) -> Result<User, UserServiceError> {
         if let Some(user) = self.get_user_by_profile(user_profile.clone()).await? {
-            Ok(self.update_user_with_profile(user.id, user_profile).await?)
+            Ok(self
+                .update_user_with_profile(&user.id, user_profile)
+                .await?)
         } else {
             let new_user = User::new(user_profile);
-            self.user_repository.insert_user(new_user.clone()).await?;
+            self.user_repository.insert_user(&new_user).await?;
             Ok(new_user)
         }
     }
 
     pub async fn update_user_with_profile(
         &mut self,
-        user_id: ObjectId,
+        user_id: &ObjectId,
         user_profile: UserProfile,
     ) -> Result<User, UserServiceError> {
         let query = UserRepository::get_update_user_profile_query(user_profile);
@@ -134,7 +137,7 @@ impl UserService {
                 .await?
             {
                 let exiten_user = self
-                    .update_user_with_profile(user_session.user_id.clone(), user_profile.clone())
+                    .update_user_with_profile(&user_session.user_id, user_profile.clone())
                     .await?;
                 user_session.tokens.update_tokens(tokens.clone());
                 // TODO: clone user session with the same token

@@ -2,7 +2,10 @@ use actix_utils::future::{ready, Ready};
 use actix_web::{dev::Payload, error::Error, FromRequest, HttpMessage, HttpRequest};
 use bson::oid::ObjectId;
 use chrono::{DateTime, Utc};
-use redis::{ErrorKind, FromRedisValue, RedisError, RedisResult, Value as RedisValue};
+use redis::{
+    ErrorKind, FromRedisValue, RedisError, RedisResult, RedisWrite, ToRedisArgs,
+    Value as RedisValue,
+};
 use serde::{Deserialize, Serialize};
 
 use std::convert::TryInto;
@@ -117,3 +120,16 @@ impl FromRequest for Session {
         ready(Ok(Session::get_session_from_http_request(&req)))
     }
 }
+
+impl ToRedisArgs for Session {
+    fn write_redis_args<W>(&self, out: &mut W)
+    where
+        W: ?Sized + RedisWrite,
+    {
+        // Serialize the Session to JSON and write it to the output
+        let serialized = serde_json::to_vec(self).expect("Failed to serialize Session to JSON");
+        out.write_arg(&serialized)
+    }
+}
+
+// impl CacheValue for Session {}

@@ -1,5 +1,7 @@
 use awc::error::HeaderValue;
 use chrono::Utc;
+use futures::future::BoxFuture;
+use futures::Future;
 use oauth2::reqwest;
 use oauth2::reqwest::AsyncHttpClientError;
 use oauth2::HttpRequest;
@@ -39,6 +41,26 @@ pub fn auth_url_as_json(auth_url: &str) -> Value {
     json!({"authorization_url": auth_url})
 }
 
+pub trait AsyncFn: Send {
+    fn handle(
+        &mut self,
+        args: HttpRequest,
+    ) -> BoxFuture<'static, Result<HttpResponse, AsyncHttpClientError>>;
+}
+
+impl<T, F> AsyncFn for T
+where
+    T: FnMut(HttpRequest) -> F + Send,
+    F: Future<Output = Result<HttpResponse, AsyncHttpClientError>> + 'static + Send,
+{
+    fn handle(
+        &mut self,
+        args: HttpRequest,
+    ) -> BoxFuture<'static, Result<HttpResponse, AsyncHttpClientError>> {
+        Box::pin(self(args))
+    }
+}
+
 pub async fn async_http_request(
     request: HttpRequest,
 ) -> Result<HttpResponse, AsyncHttpClientError> {
@@ -52,7 +74,7 @@ pub async fn async_http_request(
         result_string = "Success";
     }
     log::debug!(
-        "\n{}!!! \nRequest: {:?} \nExecution\n start: {}\nfinish: {}\nResponse body: {:?}\n, body as string: {}",
+        "\n{}!!! \nRequest: {:#?} \nExecution\n start: {}\nfinish: {}\nResponse body: {:?}\n, body as string: {}",
         result_string,
         request,
         &start,

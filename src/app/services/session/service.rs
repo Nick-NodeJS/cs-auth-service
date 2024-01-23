@@ -12,6 +12,7 @@ use crate::{
             session::{NewSessionData, Session},
         },
         repositories::session::repository::SessionRepository,
+        services::cache::service::RedisCacheService,
     },
     config::{
         cookie_config::{CookieConfiguration, CookieContentSecurity},
@@ -28,8 +29,8 @@ pub struct SessionService {
 }
 
 impl SessionService {
-    pub fn new(repository: SessionRepository) -> Self {
-        let config = SessionConfig::new();
+    pub fn new(config: SessionConfig, session_cache_service: RedisCacheService) -> Self {
+        let repository = SessionRepository::new(session_cache_service);
         SessionService { config, repository }
     }
 

@@ -10,7 +10,7 @@ use serde_json::json;
 
 use crate::app::services::storage::service::CollectionType;
 
-use super::common::AuthProviders;
+use super::common::{datetime_as_mongo_bson, AuthProviders};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CyberSherlockProfile {
@@ -58,17 +58,17 @@ impl UserProfile {
 pub struct User {
     #[serde(rename = "_id")]
     pub id: ObjectId,
-    active_profile: AuthProviders,
+    pub active_profile: AuthProviders,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    cybersherlock: Option<CyberSherlockProfile>,
+    pub cybersherlock: Option<CyberSherlockProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    google: Option<GoogleProfile>,
+    pub google: Option<GoogleProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    facebook: Option<FacebookProfile>,
-    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
-    created_at: DateTime<Utc>,
-    #[serde(with = "bson::serde_helpers::chrono_datetime_as_bson_datetime")]
-    updated_at: DateTime<Utc>,
+    pub facebook: Option<FacebookProfile>,
+    #[serde(with = "datetime_as_mongo_bson")]
+    pub created_at: DateTime<Utc>,
+    #[serde(with = "datetime_as_mongo_bson")]
+    pub updated_at: DateTime<Utc>,
 }
 
 impl User {
@@ -113,13 +113,14 @@ impl ToRedisArgs for User {
     {
         out.write_arg(
             json!({
-                "id": self.id,
+                // Need to keep underscore `_id` because of MongoDB usage
+                "_id": self.id,
                 "active_profile": self.active_profile,
                 "cybersherlock": self.cybersherlock,
                 "google": self.google,
                 "facebook": self.facebook,
-                "created_at": self.created_at.to_string(),
-                "updated_at": self.updated_at.to_string(),
+                "created_at": self.created_at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                "updated_at": self.updated_at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
             })
             .to_string()
             .as_bytes(),
@@ -130,7 +131,10 @@ impl ToRedisArgs for User {
 impl FromRedisValue for User {
     fn from_redis_value(value: &RedisValue) -> RedisResult<User> {
         match *value {
-            RedisValue::Data(ref data) => Ok(serde_json::from_slice::<User>(data)?),
+            RedisValue::Data(ref data) => {
+                let user = serde_json::from_slice::<User>(data)?;
+                Ok(user)
+            }
             _ => Err(RedisError::from((
                 ErrorKind::TypeError,
                 "Response was of incompatible type",
