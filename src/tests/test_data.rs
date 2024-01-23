@@ -1,3 +1,5 @@
+use bson::oid::ObjectId;
+
 use crate::app::models::{
     common::AuthProviders,
     session::{NewSessionData, Session},
@@ -14,13 +16,21 @@ pub struct TestData {
 
 impl TestData {
     pub fn new() -> TestData {
-        let user = User::new(UserProfile::Google(GoogleProfile {
-            user_id: String::from("fake_google_user_id"),
+        let mut google_profile = GoogleProfile {
+            user_id: String::from("fake_google_user_id_"),
             name: String::from("fake_google_user_name"),
             email: String::from("fake_google_user_email@gmail.com"),
             email_verified: true,
             picture: String::from("http://localhost"),
-        }));
+        };
+
+        // We need to keep uniq Google user_id
+        // it can catch wrong user by profile query in case equal google.user_id
+        google_profile
+            .user_id
+            .push_str(ObjectId::new().to_string().as_ref());
+        let user = User::new(UserProfile::Google(google_profile));
+
         TestData {
             user: user.clone(),
             google_session: Session::new(NewSessionData {

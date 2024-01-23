@@ -63,17 +63,19 @@ impl UserService {
         user_profile: UserProfile,
     ) -> Result<User, UserServiceError> {
         if let Some(user) = self.get_user_by_profile(user_profile.clone()).await? {
-            Ok(self.update_user_with_profile(user.id, user_profile).await?)
+            Ok(self
+                .update_user_with_profile(&user.id, user_profile)
+                .await?)
         } else {
             let new_user = User::new(user_profile);
-            self.user_repository.insert_user(new_user.clone()).await?;
+            self.user_repository.insert_user(&new_user).await?;
             Ok(new_user)
         }
     }
 
     pub async fn update_user_with_profile(
         &mut self,
-        user_id: ObjectId,
+        user_id: &ObjectId,
         user_profile: UserProfile,
     ) -> Result<User, UserServiceError> {
         let query = UserRepository::get_update_user_profile_query(user_profile);
@@ -135,7 +137,7 @@ impl UserService {
                 .await?
             {
                 let exiten_user = self
-                    .update_user_with_profile(user_session.user_id.clone(), user_profile.clone())
+                    .update_user_with_profile(&user_session.user_id, user_profile.clone())
                     .await?;
                 user_session.tokens.update_tokens(tokens.clone());
                 // TODO: clone user session with the same token

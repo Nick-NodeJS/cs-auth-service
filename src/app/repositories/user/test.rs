@@ -13,18 +13,17 @@ mod tests {
         tests::test_data::TestData,
     };
 
+    //TODO: update UserRepository with publicity of methods to test separately Cache and Storage CRUD operations
+
     #[actix_rt::test]
     async fn insert_user() {
         // user repository and test data
         let (mut user_repository, test_data) = intialize().await;
 
-        let result = user_repository.insert_user(test_data.user.clone()).await;
+        let result = user_repository.insert_user(&test_data.user).await;
         assert_eq!(result.is_ok(), true);
 
-        let inserted_result = match user_repository
-            .find_user_by_id(test_data.user.id.clone())
-            .await
-        {
+        let inserted_result = match user_repository.find_user_by_id(&test_data.user.id).await {
             Ok(user) => user,
             Err(err) => {
                 assert!(false, "{}", err.to_string());
@@ -34,7 +33,7 @@ mod tests {
         assert_eq!(inserted_result.is_some(), true);
 
         if let Some(user) = inserted_result {
-            let result = user_repository.delete_by_id(user.id).await;
+            let result = user_repository.delete_by_id(&user.id).await;
             assert_eq!(result.is_ok(), true)
         }
     }
@@ -45,7 +44,7 @@ mod tests {
         let (mut user_repository, test_data) = intialize().await;
 
         // Seed user data
-        let result = user_repository.insert_user(test_data.user.clone()).await;
+        let result = user_repository.insert_user(&test_data.user).await;
         assert_eq!(result.is_ok(), true);
 
         let user_profile = match test_data.user.google {
@@ -67,7 +66,7 @@ mod tests {
             Err(err) => assert!(false, "Error find_user_by_profile {}", err),
         };
 
-        let result = user_repository.delete_by_id(test_data.user.id).await;
+        let result = user_repository.delete_by_id(&test_data.user.id).await;
         assert_eq!(result.is_ok(), true)
     }
 

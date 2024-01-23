@@ -32,14 +32,12 @@ impl UserRepository {
 
     pub async fn find_user_by_id(
         &mut self,
-        user_id: ObjectId,
+        user_id: &ObjectId,
     ) -> Result<Option<User>, UserRepositoryError> {
-        if let Some(user) = self.get_user_from_cache(user_id)? {
+        if let Some(user) = self.get_user_by_id_from_cache(user_id)? {
             return Ok(Some(user));
         };
-        let filter = UserRepository::get_find_user_by_id_query(user_id);
-        let user = self.get_collection().find_one(filter, None).await?;
-        Ok(user)
+        self.get_user_by_id_from_storage(user_id).await
     }
 
     pub async fn find_user_by_profile(
@@ -58,35 +56,23 @@ impl UserRepository {
 
     pub async fn update_user(
         &mut self,
-        user_id: ObjectId,
+        user_id: &ObjectId,
         data_to_update: Document,
     ) -> Result<User, UserRepositoryError> {
-        let filter = UserRepository::get_find_user_by_id_query(user_id);
-        if let Some(user) = self
-            .get_collection()
-            .find_one_and_update(
-                filter.clone(),
-                doc! { "$set": data_to_update.clone() },
-                None,
-            )
-            .await?
-        {
-            self.set_user_in_cache(user.clone())?;
-            Ok(user)
-        } else {
-            log::error!(
-                "Error to update user. filter: {}, data: {}",
-                filter,
-                data_to_update
-            );
-            Err(UserRepositoryError::UpdateUserError)
-        }
+        let user = self.update_user_in_storage(user_id, data_to_update).await?;
+        self.set_user_in_cache(&user)?;
+        Ok(user)
     }
 
-    pub async fn insert_user(&mut self, user: User) -> Result<(), UserRepositoryError> {
-        let result = self.get_collection().insert_one(user.clone(), None).await?;
-        println!("Inserted result {:?}", result);
+    pub async fn insert_user(&mut self, user: &User) -> Result<(), UserRepositoryError> {
+        self.insert_user_in_storage(user).await?;
         self.set_user_in_cache(user)?;
+        Ok(())
+    }
+
+    pub async fn delete_by_id(&mut self, user_id: &ObjectId) -> Result<(), UserRepositoryError> {
+        self.delete_by_id_in_storage(user_id).await?;
+        self.delete_by_id_in_cache(user_id).await?;
         Ok(())
     }
 
@@ -94,9 +80,9 @@ impl UserRepository {
         self.storage.get_collection::<User>(&self.collection)
     }
 
-    fn get_user_from_cache(
+    fn get_user_by_id_from_cache(
         &mut self,
-        user_id: ObjectId,
+        user_id: &ObjectId,
     ) -> Result<Option<User>, UserRepositoryError> {
         let try_user = self
             .cache
@@ -111,24 +97,68 @@ impl UserRepository {
         Ok(user)
     }
 
-    fn set_user_in_cache(&mut self, user: User) -> Result<(), UserRepositoryError> {
+    fn set_user_in_cache(&mut self, user: &User) -> Result<(), UserRepositoryError> {
         self.cache.set_value_with_ttl::<User>(
             &User::get_user_cache_key(user.id.to_string().as_ref()),
-            user,
+            user.to_owned(),
             self.config.user_cache_ttl_sec,
         )?;
         Ok(())
     }
 
-    pub async fn delete_by_id(&mut self, user_id: ObjectId) -> Result<(), UserRepositoryError> {
-        self.get_collection()
-            .delete_one(
-                UserRepository::get_find_user_by_id_query(user_id.clone()),
-                None,
-            )
-            .await?;
+    async fn delete_by_id_in_cache(
+        &mut self,
+        user_id: &ObjectId,
+    ) -> Result<(), UserRepositoryError> {
         let key = User::get_user_cache_key(user_id.to_string().as_ref());
         self.cache.delete_values(vec![key])?;
+        Ok(())
+    }
+
+    async fn insert_user_in_storage(&self, user: &User) -> Result<(), UserRepositoryError> {
+        self.get_collection().insert_one(user, None).await?;
+        Ok(())
+    }
+
+    async fn update_user_in_storage(
+        &mut self,
+        user_id: &ObjectId,
+        data_to_update: Document,
+    ) -> Result<User, UserRepositoryError> {
+        let filter = UserRepository::get_find_user_by_id_query(user_id);
+        if let Some(user) = self
+            .get_collection()
+            .find_one_and_update(
+                filter.clone(),
+                doc! { "$set": data_to_update.clone() },
+                None,
+            )
+            .await?
+        {
+            Ok(user)
+        } else {
+            log::error!(
+                "Error to update user. filter: {}, data: {}",
+                filter,
+                data_to_update
+            );
+            Err(UserRepositoryError::UpdateUserError)
+        }
+    }
+
+    async fn get_user_by_id_from_storage(
+        &self,
+        user_id: &ObjectId,
+    ) -> Result<Option<User>, UserRepositoryError> {
+        let filter = UserRepository::get_find_user_by_id_query(user_id);
+        let user = self.get_collection().find_one(filter, None).await?;
+        Ok(user)
+    }
+
+    async fn delete_by_id_in_storage(&self, user_id: &ObjectId) -> Result<(), UserRepositoryError> {
+        self.get_collection()
+            .delete_one(UserRepository::get_find_user_by_id_query(user_id), None)
+            .await?;
         Ok(())
     }
 
@@ -177,7 +207,7 @@ impl UserRepository {
 
         query
     }
-    pub fn get_find_user_by_id_query(user_id: ObjectId) -> Document {
+    pub fn get_find_user_by_id_query(user_id: &ObjectId) -> Document {
         doc! {
             "_id": user_id
         }

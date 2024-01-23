@@ -74,7 +74,7 @@ pub async fn async_http_request(
         result_string = "Success";
     }
     log::debug!(
-        "\n{}!!! \nRequest: {:?} \nExecution\n start: {}\nfinish: {}\nResponse body: {:?}\n, body as string: {}",
+        "\n{}!!! \nRequest: {:#?} \nExecution\n start: {}\nfinish: {}\nResponse body: {:?}\n, body as string: {}",
         result_string,
         request,
         &start,
