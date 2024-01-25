@@ -70,6 +70,22 @@ mod tests {
         assert_eq!(result.is_ok(), true)
     }
 
+    #[actix_rt::test]
+    async fn delete_user() {
+        // user repository and test data
+        let (mut user_repository, test_data) = intialize().await;
+
+        let result = user_repository.insert_user(&test_data.user).await;
+        assert_eq!(result.is_ok(), true);
+
+        let result = user_repository.delete_by_id(&test_data.user.id).await;
+        assert_eq!(result.is_ok(), true);
+
+        match user_repository.find_user_by_id(&test_data.user.id).await {
+            Ok(user) => assert_eq!(user.is_none(), true),
+            Err(err) => assert!(false, "{}", err.to_string()),
+        }
+    }
     async fn intialize() -> (UserRepository, TestData) {
         let user_config = UserConfig::new();
         // Storage service

@@ -67,20 +67,26 @@ pub async fn async_http_request(
     let start = Utc::now();
     let response = async_http_client(request.clone()).await?;
     let finish = Utc::now();
-    let result_string: &str;
+    let mut message_string: String;
     if !response.status_code.is_success() {
-        result_string = "Fail";
+        message_string = String::from("\nFail!!!\n");
     } else {
-        result_string = "Success";
+        message_string = String::from("\nSuccess!!!\n");
     }
-    log::debug!(
-        "\n{}!!! \nRequest: {:#?} \nExecution\n start: {}\nfinish: {}\nResponse body: {:?}\n, body as string: {}",
-        result_string,
-        request,
-        &start,
-        &finish,
-        &response.body,
-        String::from_utf8_lossy(&response.body)
+    message_string.push_str(
+        format!(
+            "Request: {:#?} \nExecution\n start: {}\nfinish: {}\nResponse body:",
+            request, &start, &finish,
+        )
+        .as_ref(),
     );
+    let body_as_json = match serde_json::from_slice(&response.body) {
+        Ok(json) => json,
+        Err(_) => json!({
+                "BODY_AS_A_STRING": String::from_utf8_lossy(&response.body)
+        }),
+    };
+    message_string.push_str(format!("{:#?}\n", body_as_json).as_ref());
+    log::debug!("{message_string}");
     Ok(response)
 }

@@ -44,7 +44,7 @@ impl UserRepository {
         &mut self,
         profile: UserProfile,
     ) -> Result<Option<User>, UserRepositoryError> {
-        let filter = UserRepository::get_find_user_by_profile_query(profile);
+        let filter = get_find_user_by_profile_query(profile);
         let user = self.find_one(filter).await?;
         Ok(user)
     }
@@ -76,6 +76,15 @@ impl UserRepository {
         Ok(())
     }
 
+    pub async fn update_user_with_profile(
+        &mut self,
+        user_id: &ObjectId,
+        user_profile: UserProfile,
+    ) -> Result<User, UserRepositoryError> {
+        let query = get_update_user_profile_query(user_profile);
+        let user = self.update_user(user_id, query).await?;
+        Ok(user)
+    }
     fn get_collection(&self) -> Collection<User> {
         self.storage.get_collection::<User>(&self.collection)
     }
@@ -125,7 +134,7 @@ impl UserRepository {
         user_id: &ObjectId,
         data_to_update: Document,
     ) -> Result<User, UserRepositoryError> {
-        let filter = UserRepository::get_find_user_by_id_query(user_id);
+        let filter = get_find_user_by_id_query(user_id);
         if let Some(user) = self
             .get_collection()
             .find_one_and_update(
@@ -150,66 +159,68 @@ impl UserRepository {
         &self,
         user_id: &ObjectId,
     ) -> Result<Option<User>, UserRepositoryError> {
-        let filter = UserRepository::get_find_user_by_id_query(user_id);
+        let filter = get_find_user_by_id_query(user_id);
         let user = self.get_collection().find_one(filter, None).await?;
         Ok(user)
     }
 
     async fn delete_by_id_in_storage(&self, user_id: &ObjectId) -> Result<(), UserRepositoryError> {
         self.get_collection()
-            .delete_one(UserRepository::get_find_user_by_id_query(user_id), None)
+            .delete_one(get_find_user_by_id_query(user_id), None)
             .await?;
         Ok(())
     }
+}
 
-    pub fn get_update_user_profile_query(user_profile: UserProfile) -> Document {
-        let mut data_to_update = match user_profile {
-            UserProfile::CyberSherlock(cyber_sherlock_profile) => {
-                doc! {
-                    "cybersherlock.name": cyber_sherlock_profile.name,
-                    "cybersherlock.email": cyber_sherlock_profile.email,
-                    "cybersherlock.email_verified": cyber_sherlock_profile.email_verified,
-                    "cybersherlock.picture": cyber_sherlock_profile.picture,
-                }
-            }
-            UserProfile::Google(google_profile) => {
-                doc! {
-                    "google.name": google_profile.name,
-                    "google.email": google_profile.email,
-                    "google.email_verified": google_profile.email_verified,
-                    "google.picture": google_profile.picture,
-                }
-            }
-            UserProfile::Facebook(facebook_profile) => {
-                doc! {
-                    "facebook.name": facebook_profile.name,
-                    "facebook.email": facebook_profile.email,
-                }
-            }
-        };
-        data_to_update.insert("updated_at", Utc::now());
-
-        data_to_update
-    }
-    pub fn get_find_user_by_profile_query(user_profile: UserProfile) -> Document {
-        let mut query = doc! {};
-        match user_profile {
-            UserProfile::CyberSherlock(cyber_sherlock_profile) => {
-                query.insert("cybersherlock.user_id", cyber_sherlock_profile.user_id);
-            }
-            UserProfile::Google(google_profile) => {
-                query.insert("google.user_id", google_profile.user_id);
-            }
-            UserProfile::Facebook(facebook_profile) => {
-                query.insert("facebook.user_id", facebook_profile.user_id);
+fn get_update_user_profile_query(user_profile: UserProfile) -> Document {
+    let mut data_to_update = match user_profile {
+        UserProfile::CyberSherlock(cyber_sherlock_profile) => {
+            doc! {
+                "cybersherlock.name": cyber_sherlock_profile.name,
+                "cybersherlock.email": cyber_sherlock_profile.email,
+                "cybersherlock.email_verified": cyber_sherlock_profile.email_verified,
+                "cybersherlock.picture": cyber_sherlock_profile.picture,
             }
         }
-
-        query
-    }
-    pub fn get_find_user_by_id_query(user_id: &ObjectId) -> Document {
-        doc! {
-            "_id": user_id
+        UserProfile::Google(google_profile) => {
+            doc! {
+                "google.name": google_profile.name,
+                "google.email": google_profile.email,
+                "google.email_verified": google_profile.email_verified,
+                "google.picture": google_profile.picture,
+            }
         }
+        UserProfile::Facebook(facebook_profile) => {
+            doc! {
+                "facebook.name": facebook_profile.name,
+                "facebook.email": facebook_profile.email,
+            }
+        }
+    };
+    data_to_update.insert("updated_at", Utc::now());
+
+    data_to_update
+}
+
+fn get_find_user_by_profile_query(user_profile: UserProfile) -> Document {
+    let mut query = doc! {};
+    match user_profile {
+        UserProfile::CyberSherlock(cyber_sherlock_profile) => {
+            query.insert("cybersherlock.user_id", cyber_sherlock_profile.user_id);
+        }
+        UserProfile::Google(google_profile) => {
+            query.insert("google.user_id", google_profile.user_id);
+        }
+        UserProfile::Facebook(facebook_profile) => {
+            query.insert("facebook.user_id", facebook_profile.user_id);
+        }
+    }
+
+    query
+}
+
+fn get_find_user_by_id_query(user_id: &ObjectId) -> Document {
+    doc! {
+        "_id": user_id
     }
 }

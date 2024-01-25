@@ -78,8 +78,10 @@ impl UserService {
         user_id: &ObjectId,
         user_profile: UserProfile,
     ) -> Result<User, UserServiceError> {
-        let query = UserRepository::get_update_user_profile_query(user_profile);
-        let user = self.user_repository.update_user(user_id, query).await?;
+        let user = self
+            .user_repository
+            .update_user_with_profile(user_id, user_profile)
+            .await?;
         Ok(user)
     }
 

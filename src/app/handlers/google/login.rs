@@ -2,7 +2,7 @@ use crate::app::{
     app_data::AppData,
     app_error::AppError,
     models::session_metadata::SessionMetadata,
-    services::{common::auth_url_as_json, google::structures::LoginCacheData},
+    services::{common::auth_url_as_json, google::common::LoginCacheData},
 };
 use actix_web::{web, HttpRequest, HttpResponse};
 
