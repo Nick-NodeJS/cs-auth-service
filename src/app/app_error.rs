@@ -5,9 +5,12 @@ use actix_web_thiserror_derive::ResponseError;
 use log::error;
 use thiserror::Error;
 
-use super::services::{
-    cache::error::CacheServiceError, google::error::GoogleServiceError,
-    storage::error::StorageServiceError, user::error::UserServiceError,
+use super::{
+    providers::error::ProviderError,
+    services::{
+        cache::error::CacheServiceError, storage::error::StorageServiceError,
+        user::error::UserServiceError,
+    },
 };
 
 #[derive(Debug, Error, ResponseError)]
@@ -17,53 +20,25 @@ pub enum AppError {
     LockError,
 
     #[response(reason = "Internal service error")]
-    #[error("GoogleService error")]
-    GoogleServiceError,
+    #[error("Provider Error: {0}")]
+    ProviderError(#[from] ProviderError),
 
     #[response(reason = "Internal service error")]
-    #[error("UserService error")]
-    UserServiceError,
+    #[error("UserService error: {0}")]
+    UserServiceError(#[from] UserServiceError),
 
     #[response(reason = "Internal service error")]
-    #[error("StorageService error")]
-    StorageServiceError,
+    #[error("StorageService error: {0}")]
+    StorageServiceError(#[from] StorageServiceError),
 
     #[response(reason = "Internal service error")]
-    #[error("CacheService error")]
-    CacheServiceError,
+    #[error("CacheService error: {0}")]
+    CacheServiceError(#[from] CacheServiceError),
 }
 
 impl<T> From<PoisonError<T>> for AppError {
     fn from(err: PoisonError<T>) -> Self {
         log::debug!("Lock Mutex error: {}", err);
         return AppError::LockError;
-    }
-}
-
-impl From<UserServiceError> for AppError {
-    fn from(err: UserServiceError) -> Self {
-        log::debug!("UserServiceError: {:?}", err);
-        return AppError::UserServiceError;
-    }
-}
-
-impl From<GoogleServiceError> for AppError {
-    fn from(err: GoogleServiceError) -> Self {
-        log::debug!("GoogleServiceError: {:?}", err);
-        return AppError::GoogleServiceError;
-    }
-}
-
-impl From<StorageServiceError> for AppError {
-    fn from(err: StorageServiceError) -> Self {
-        log::debug!("StorageServiceError: {:?}", err);
-        return AppError::StorageServiceError;
-    }
-}
-
-impl From<CacheServiceError> for AppError {
-    fn from(err: CacheServiceError) -> Self {
-        log::debug!("CacheServiceError: {:?}", err);
-        return AppError::CacheServiceError;
     }
 }

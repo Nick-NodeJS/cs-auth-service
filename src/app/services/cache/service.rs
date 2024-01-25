@@ -25,6 +25,7 @@ impl RedisCacheService {
             CacheServiceType::Session => redis_config.session_database,
             CacheServiceType::Google => redis_config.google_database,
             CacheServiceType::User => redis_config.user_database,
+            CacheServiceType::Facebook => redis_config.facebook_database,
         };
         let client = Client::open(redis_config.get_redis_url(database))?;
         Ok(RedisCacheService { client })

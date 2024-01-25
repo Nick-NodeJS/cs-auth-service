@@ -21,12 +21,14 @@ use crate::app::models::session_tokens::SessionTokens;
 use crate::app::models::token::Token;
 use crate::app::models::user::GoogleProfile;
 use crate::app::services::cache::service::RedisCacheService;
-use crate::app::services::common::{async_http_request, get_x_www_form_headers, AsyncFn};
-use crate::app::services::google::common::GoogleTokenResponse;
+use crate::app::services::common::{
+    async_http_request, get_x_www_form_headers, AsyncFn, LoginCacheData,
+};
 use crate::config::google_config::GoogleConfig;
 
+use super::super::error::ProviderError;
 use super::common::{
-    GoogleCert, GoogleKeys, LoginCacheData, TokenClaims, TokenHeaderObject, UserInfo,
+    GoogleCert, GoogleKeys, GoogleTokenResponse, TokenClaims, TokenHeaderObject, UserInfo,
 };
 use super::error::GoogleServiceError;
 
@@ -49,13 +51,13 @@ impl GoogleService {
         }
     }
 
-    pub async fn init(&mut self) -> Result<(), GoogleServiceError> {
+    pub async fn init(&mut self) -> Result<(), ProviderError> {
         // check Google certificates
         let _ = self.get_certificates().await?;
         Ok(())
     }
 
-    pub async fn get_certificates(&mut self) -> Result<Vec<GoogleCert>, GoogleServiceError> {
+    pub async fn get_certificates(&mut self) -> Result<Vec<GoogleCert>, ProviderError> {
         // get Google certificates in case we do not have them in cache only
         if let Some(certificates_from_cache) = self.get_certificates_from_cache().await? {
             return Ok(certificates_from_cache);
@@ -118,7 +120,7 @@ impl GoogleService {
         &mut self,
         csrf_state: &str,
         login_cache_data: &LoginCacheData,
-    ) -> Result<(), GoogleServiceError> {
+    ) -> Result<(), ProviderError> {
         self.cache_service.set_value_with_ttl::<String>(
             csrf_state,
             RedisCacheService::struct_to_cache_string(login_cache_data)?,
@@ -127,10 +129,7 @@ impl GoogleService {
         Ok(())
     }
 
-    pub fn get_pkce_code_verifier(
-        &mut self,
-        state: &str,
-    ) -> Result<LoginCacheData, GoogleServiceError> {
+    pub fn get_pkce_code_verifier(&mut self, state: &str) -> Result<LoginCacheData, ProviderError> {
         // process code and state
         let login_cache_data_value = self
             .cache_service
@@ -139,7 +138,7 @@ impl GoogleService {
             Ok(login_cache_data)
         } else {
             log::debug!("No callback request state {} in Redis", state);
-            return Err(GoogleServiceError::CallbackStateCacheError);
+            return Err(ProviderError::CallbackStateCacheError);
         }
     }
 
@@ -152,7 +151,7 @@ impl GoogleService {
         &mut self,
         code: String,
         pkce_code_verifier: String,
-    ) -> Result<SessionTokens, GoogleServiceError> {
+    ) -> Result<SessionTokens, ProviderError> {
         // Exchange the code with a token.
 
         // oauth2::BasicClient doesn't have in StandartTokenResponse "id_token"
@@ -180,7 +179,7 @@ impl GoogleService {
         .map_err(|err| format!("Get token request error: {err}"))?;
 
         if !response.status_code.is_success() {
-            return Err(GoogleServiceError::OAuth2RequestTokenError);
+            return Err(ProviderError::OAuth2RequestTokenError);
         }
         let response = serde_json::from_slice::<GoogleTokenResponse>(&response.body)?;
         let tokens = get_session_tokens(response);
@@ -190,14 +189,14 @@ impl GoogleService {
     pub async fn get_token_key(
         &mut self,
         token: &str,
-    ) -> Result<Option<DecodingKey>, GoogleServiceError> {
+    ) -> Result<Option<DecodingKey>, ProviderError> {
         let token_string = token.to_string();
         let token_parts: Vec<&str> = token_string.split('.').collect();
         let header = match token_parts.into_iter().next() {
             Some(header) => header,
             None => {
                 log::warn!("Bad token, no header found. Token: {}", token_string);
-                return Err(GoogleServiceError::BadTokenStructure);
+                return Err(ProviderError::BadTokenStructure);
             }
         };
         let decoded_slice = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(header)?;
@@ -210,10 +209,10 @@ impl GoogleService {
     pub async fn get_user_profile(
         &mut self,
         token: Option<Token>,
-    ) -> Result<GoogleProfile, GoogleServiceError> {
+    ) -> Result<GoogleProfile, ProviderError> {
         let access_token = match token {
             Some(token) => token.token_string,
-            None => return Err(GoogleServiceError::BadTokenStructure),
+            None => return Err(ProviderError::BadTokenStructure),
         };
         let key = match self.get_token_key(access_token.clone().as_ref()).await? {
             Some(decoding_key) => decoding_key,
@@ -240,7 +239,7 @@ impl GoogleService {
     pub async fn get_user_profile_on_gapi(
         &self,
         token: &str,
-    ) -> Result<GoogleProfile, GoogleServiceError> {
+    ) -> Result<GoogleProfile, ProviderError> {
         let mut headers = HeaderMap::new();
         headers.insert(
             "Authorization",
@@ -256,7 +255,7 @@ impl GoogleService {
         {
             Ok(response) => response,
             Err(_) => {
-                return Err(GoogleServiceError::TokenDataResponseError);
+                return Err(ProviderError::TokenDataResponseError);
             }
         };
         let user_info = serde_json::from_slice::<UserInfo>(&user_info_response.body)?;
@@ -273,7 +272,7 @@ impl GoogleService {
     pub fn parse_auth_query_string(
         &self,
         query_string: &str,
-    ) -> Result<(String, String), GoogleServiceError> {
+    ) -> Result<(String, String), ProviderError> {
         let try_params = web::Query::<HashMap<String, String>>::from_query(query_string);
         match try_params {
             Ok(params) => {
@@ -281,33 +280,33 @@ impl GoogleService {
                 if let Some(code_string) = params.get("code") {
                     code = code_string.to_owned();
                 } else {
-                    return Err(GoogleServiceError::CodeParamError);
+                    return Err(ProviderError::CodeParamError);
                 };
                 let state: String;
                 if let Some(state_string) = params.get("state") {
                     state = state_string.to_owned();
                 } else {
-                    return Err(GoogleServiceError::CodeParamError);
+                    return Err(ProviderError::CodeParamError);
                 };
                 return Ok((code, state));
             }
             Err(err) => {
                 log::error!("{}", err.to_string());
-                return Err(GoogleServiceError::QueryStringError);
+                return Err(ProviderError::QueryStringError);
             }
         }
     }
 
-    pub async fn logout(&self, tokens: SessionTokens) -> Result<(), GoogleServiceError> {
+    pub async fn logout(&self, tokens: SessionTokens) -> Result<(), ProviderError> {
         if let Some(token) = tokens.refresh_token {
             self.revoke_token(token.token_string.as_ref()).await
         } else {
             log::error!("Google logout error. No refresh token");
-            Err(GoogleServiceError::BadTokenStructure)
+            Err(ProviderError::BadTokenStructure)
         }
     }
 
-    pub async fn revoke_token(&self, token: &str) -> Result<(), GoogleServiceError> {
+    pub async fn revoke_token(&self, token: &str) -> Result<(), ProviderError> {
         let mut url = Url::parse(&self.config.google_revoke_url).expect("parse url error");
         url.set_query(Some(format!("token={}", token.clone()).as_ref()));
         let revoke_response = match async_http_request(HttpRequest {
@@ -321,11 +320,11 @@ impl GoogleService {
             Ok(response) => response,
             Err(err) => {
                 log::error!("Google revoke token request error: {}", err);
-                return Err(GoogleServiceError::RevokeRequestError);
+                return Err(ProviderError::RevokeRequestError);
             }
         };
         if !revoke_response.status_code.is_success() {
-            return Err(GoogleServiceError::RevokeRequestError);
+            return Err(ProviderError::RevokeRequestError);
         }
         log::debug!("Revoked Google token {} successfuly", token);
         Ok(())
@@ -335,7 +334,7 @@ impl GoogleService {
         &mut self,
         certificates: Vec<GoogleCert>,
         expires: DateTime<Utc>,
-    ) -> Result<(), GoogleServiceError> {
+    ) -> Result<(), ProviderError> {
         let now = Utc::now();
         let expired_duration = expires.signed_duration_since(now).num_seconds();
         self.cache_service.set_value_with_ttl(
@@ -348,7 +347,7 @@ impl GoogleService {
 
     async fn get_certificates_from_cache(
         &mut self,
-    ) -> Result<Option<Vec<GoogleCert>>, GoogleServiceError> {
+    ) -> Result<Option<Vec<GoogleCert>>, ProviderError> {
         let try_certs = self
             .cache_service
             .get_value::<String>(&self.config.google_cache_certs_key)?;
@@ -363,7 +362,7 @@ impl GoogleService {
 
     async fn get_google_oauth2_certificates(
         &mut self,
-    ) -> Result<(Vec<GoogleCert>, DateTime<Utc>), GoogleServiceError> {
+    ) -> Result<(Vec<GoogleCert>, DateTime<Utc>), ProviderError> {
         let jwks_response = match self
             .async_http_request
             .handle(HttpRequest {
@@ -377,13 +376,19 @@ impl GoogleService {
         {
             Ok(response) => response,
             Err(_) => {
-                return Err(GoogleServiceError::OAuth2CertificatesResponse);
+                return Err(ProviderError::GoogleServiceError(
+                    GoogleServiceError::OAuth2CertificatesResponse,
+                ));
             }
         };
 
         let cert_expires = match jwks_response.headers.get("expires") {
             Some(value) => value.to_str()?,
-            None => return Err(GoogleServiceError::OAuth2CertificatesResponse),
+            None => {
+                return Err(ProviderError::GoogleServiceError(
+                    GoogleServiceError::OAuth2CertificatesResponse,
+                ))
+            }
         };
         let cert_expires_datetime: DateTime<Utc> =
             DateTime::parse_from_rfc2822(cert_expires)?.into();
@@ -420,7 +425,7 @@ pub fn decode_token(
     token: &str,
     key: &DecodingKey,
     check_expiration: bool,
-) -> Result<TokenClaims, GoogleServiceError> {
+) -> Result<TokenClaims, ProviderError> {
     // Validation configuration
     let mut validation = Validation::new(Algorithm::RS256);
     if !check_expiration {
@@ -431,7 +436,7 @@ pub fn decode_token(
         Ok(data) => data,
         Err(err) => {
             log::warn!("Decode Error: {}\n token: {}\n", err, token);
-            return Err(GoogleServiceError::JWTDecodingError);
+            return Err(ProviderError::JWTDecodingError);
         }
     };
 
@@ -441,7 +446,7 @@ pub fn decode_token(
 pub fn get_decoding_key_from_vec_cert(
     certs: Vec<GoogleCert>,
     kid: String,
-) -> Result<Option<DecodingKey>, GoogleServiceError> {
+) -> Result<Option<DecodingKey>, ProviderError> {
     let cert = certs.clone().into_iter().find(|c| c.kid == kid);
     if let Some(certificate) = cert {
         let key = DecodingKey::from_rsa_components(&certificate.n, &certificate.e)?;

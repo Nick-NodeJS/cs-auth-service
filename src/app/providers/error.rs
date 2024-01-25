@@ -8,10 +8,18 @@ use thiserror::Error;
 
 use crate::app::services::cache::error::CacheServiceError;
 
+use super::{facebook::error::FacebookServiceError, google::error::GoogleServiceError};
+
 #[derive(Debug, Error)]
-pub enum GoogleServiceError {
-    #[error("CacheService error")]
-    CacheServiceError,
+pub enum ProviderError {
+    #[error("Google Service error: {0}")]
+    FacebookServiceError(#[from] FacebookServiceError),
+
+    #[error("Google Service error: {0}")]
+    GoogleServiceError(#[from] GoogleServiceError),
+
+    #[error("CacheService error: {0}")]
+    CacheServiceError(#[from] CacheServiceError),
 
     #[error("JWT decoding error")]
     JWTDecodingError,
@@ -55,9 +63,8 @@ pub enum GoogleServiceError {
     #[error("Base64 decode error")]
     Base64DecodeError,
 
-    #[error("OAuth2 certificates response has no expires header")]
-    OAuth2CertificatesResponse,
-
+    // #[error("OAuth2 certificates response has no expires header")]
+    // OAuth2CertificatesResponse,
     #[error("Revoke request error")]
     RevokeRequestError,
 
@@ -71,97 +78,90 @@ pub enum GoogleServiceError {
     InvalidHeaderValue,
 }
 
-impl From<CacheServiceError> for GoogleServiceError {
-    fn from(err: CacheServiceError) -> Self {
-        log::debug!("CacheService error: {:?}", err);
-        return GoogleServiceError::CacheServiceError;
-    }
-}
-
-impl From<JWTError> for GoogleServiceError {
+impl From<JWTError> for ProviderError {
     fn from(err: JWTError) -> Self {
         log::debug!("JWTDecodingError: {:?}", err);
-        return GoogleServiceError::JWTDecodingError;
+        return ProviderError::JWTDecodingError;
     }
 }
 
-impl From<SendRequestError> for GoogleServiceError {
+impl From<SendRequestError> for ProviderError {
     fn from(err: SendRequestError) -> Self {
         log::debug!("SendRequestError: {:?}", err);
-        return GoogleServiceError::SendRequestError;
+        return ProviderError::SendRequestError;
     }
 }
 
-impl From<JsonPayloadError> for GoogleServiceError {
+impl From<JsonPayloadError> for ProviderError {
     fn from(err: JsonPayloadError) -> Self {
         log::debug!("JsonPayloadError: {:?}", err);
-        return GoogleServiceError::JsonPayloadError;
+        return ProviderError::JsonPayloadError;
     }
 }
 
-impl From<String> for GoogleServiceError {
+impl From<String> for ProviderError {
     fn from(err: String) -> Self {
         log::debug!("Error: {}", err);
-        return GoogleServiceError::Error;
+        return ProviderError::Error;
     }
 }
 
-impl<T, P> From<RequestTokenError<T, P>> for GoogleServiceError
+impl<T, P> From<RequestTokenError<T, P>> for ProviderError
 where
     T: std::error::Error,
     P: oauth2::ErrorResponse,
 {
     fn from(err: RequestTokenError<T, P>) -> Self {
         log::debug!("OAuth2 request token error: {:?}", err);
-        return GoogleServiceError::OAuth2RequestTokenError;
+        return ProviderError::OAuth2RequestTokenError;
     }
 }
 
-impl From<oauth2::url::ParseError> for GoogleServiceError {
+impl From<oauth2::url::ParseError> for ProviderError {
     fn from(err: oauth2::url::ParseError) -> Self {
         log::debug!("oauth2::url::ParseError: {}", err);
-        return GoogleServiceError::UrlParseError;
+        return ProviderError::UrlParseError;
     }
 }
 
-impl From<serde_json::Error> for GoogleServiceError {
+impl From<serde_json::Error> for ProviderError {
     fn from(err: serde_json::Error) -> Self {
         log::debug!("serde_json::Error: {}", err);
-        return GoogleServiceError::SerdeJsonError;
+        return ProviderError::SerdeJsonError;
     }
 }
 
-impl From<FromUtf8Error> for GoogleServiceError {
+impl From<FromUtf8Error> for ProviderError {
     fn from(err: FromUtf8Error) -> Self {
         log::debug!("FromUtf8Error: {}", err);
-        return GoogleServiceError::FromUtf8Error;
+        return ProviderError::FromUtf8Error;
     }
 }
 
-impl From<base64::DecodeError> for GoogleServiceError {
+impl From<base64::DecodeError> for ProviderError {
     fn from(err: base64::DecodeError) -> Self {
         log::debug!("base64::DecodeError: {}", err);
-        return GoogleServiceError::Base64DecodeError;
+        return ProviderError::Base64DecodeError;
     }
 }
 
-impl From<actix_web::http::header::ToStrError> for GoogleServiceError {
+impl From<actix_web::http::header::ToStrError> for ProviderError {
     fn from(err: actix_web::http::header::ToStrError) -> Self {
         log::debug!("actix_web::http::header::ToStrError: {}", err);
-        return GoogleServiceError::HeaderToStrError;
+        return ProviderError::HeaderToStrError;
     }
 }
 
-impl From<chrono::ParseError> for GoogleServiceError {
+impl From<chrono::ParseError> for ProviderError {
     fn from(err: chrono::ParseError) -> Self {
         log::debug!("chrono::ParseError: {}", err);
-        return GoogleServiceError::ChronoParseError;
+        return ProviderError::ChronoParseError;
     }
 }
 
-impl From<InvalidHeaderValue> for GoogleServiceError {
+impl From<InvalidHeaderValue> for ProviderError {
     fn from(err: InvalidHeaderValue) -> Self {
         log::debug!("InvalidHeaderValue: {}", err);
-        return GoogleServiceError::InvalidHeaderValue;
+        return ProviderError::InvalidHeaderValue;
     }
 }

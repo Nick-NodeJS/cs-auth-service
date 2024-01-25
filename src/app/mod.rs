@@ -3,9 +3,9 @@ pub mod app_error;
 pub mod handlers;
 pub mod middlewares;
 pub mod models;
+pub mod providers;
 pub mod repositories;
 pub mod services;
-// pub mod tests;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
 
@@ -19,6 +19,9 @@ use crate::config::session_config::SessionConfig;
 use env_logger::Env;
 use log::info;
 
+use crate::app::handlers::facebook::{
+    auth_callback::auth_callback as facebook_auth_callback, login::login as login_with_facebook,
+};
 use crate::app::handlers::google::{
     auth_callback::auth_callback as google_auth_callback, login::login as login_with_google,
 };
@@ -58,6 +61,11 @@ pub async fn run() -> std::io::Result<()> {
                     .service(
                         web::scope("/v1").service(
                             web::scope("/auth")
+                                .service(
+                                    web::scope("/facebook")
+                                        .route("/login", web::get().to(login_with_facebook))
+                                        .route("/callback", web::get().to(facebook_auth_callback)),
+                                )
                                 .service(
                                     web::scope("/google")
                                         .route("/login", web::get().to(login_with_google))

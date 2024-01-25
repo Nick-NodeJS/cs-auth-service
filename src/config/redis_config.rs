@@ -6,6 +6,7 @@ use serde::Deserialize;
 pub struct RedisConfig {
     pub host: String,
     pub port: u16,
+    pub facebook_database: i16,
     pub google_database: i16,
     pub session_database: i16,
     pub user_database: i16,
@@ -30,6 +31,16 @@ impl RedisConfig {
         // Validate redis address using the ip-address crate
         if !is_valid_ipv4(&host) {
             panic!("Invalid redis address");
+        }
+
+        // Validate and parse the redis Facebook database
+        let facebook_database = dotenv::var("REDIS_FACEBOOK_DATABASE")
+            .expect("REDIS_FACEBOOK_DATABASE environment variable is not set")
+            .parse()
+            .expect("Invalid Redis Facebook database");
+
+        if !validate_integer_in_range(facebook_database, 0, 15) {
+            panic!("Redis Facebook database out of the range");
         }
 
         // Validate and parse the redis Google database
@@ -65,6 +76,7 @@ impl RedisConfig {
         Self {
             host,
             port,
+            facebook_database,
             google_database,
             session_database,
             user_database,

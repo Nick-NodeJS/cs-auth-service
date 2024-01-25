@@ -13,7 +13,7 @@ actix-web = { version = "4.4.0", features = ["secure-cookies"]}
 actix-utils = "3.0.1"
 cs_shared_lib = { path = "./cs_shared_lib" }
 dotenv = "0.15.0"
-env_logger = "0.10.0"
+env_logger = "0.11.0"
 jsonwebtoken = "8.0.0"
 log = "0.4"
 oauth2 = "4.4.1"
@@ -30,7 +30,7 @@ mongodb = "2.7.1"
 chrono = "0.4.31"
 bson = { version = "2.7.0", features = ["chrono-0_4"] }
 derivative = "2.2.0"
-uuid = { version = "1.6.1", feature = ["v4", "fast-rng"] }
+uuid = { version = "1.6.1", features = ["v4", "fast-rng"] }
 rand = "0.8.5"
 futures = "0.3.30"
 
