@@ -22,13 +22,13 @@ use crate::app::models::token::Token;
 use crate::app::models::user::GoogleProfile;
 use crate::app::services::cache::service::RedisCacheService;
 use crate::app::services::common::{async_http_request, get_x_www_form_headers, AsyncFn};
-use crate::app::services::google::structures::GoogleTokenResponse;
+use crate::app::services::google::common::GoogleTokenResponse;
 use crate::config::google_config::GoogleConfig;
 
-use super::error::GoogleServiceError;
-use super::structures::{
+use super::common::{
     GoogleCert, GoogleKeys, LoginCacheData, TokenClaims, TokenHeaderObject, UserInfo,
 };
+use super::error::GoogleServiceError;
 
 pub struct GoogleService {
     async_http_request: Box<dyn AsyncFn>,
@@ -360,6 +360,7 @@ impl GoogleService {
             None => Ok(None),
         }
     }
+
     async fn get_google_oauth2_certificates(
         &mut self,
     ) -> Result<(Vec<GoogleCert>, DateTime<Utc>), GoogleServiceError> {
