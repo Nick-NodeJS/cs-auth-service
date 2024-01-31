@@ -6,12 +6,8 @@ use oauth2::reqwest;
 use oauth2::reqwest::AsyncHttpClientError;
 use oauth2::HttpRequest;
 use oauth2::{http::HeaderMap, HttpResponse};
-use redis::{ErrorKind, FromRedisValue, RedisError, RedisResult, Value as RedisValue};
 use reqwest::async_http_client;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-
-use crate::app::models::session_metadata::SessionMetadata;
 
 /// return error string as json object
 /// #### Arguments
@@ -93,25 +89,4 @@ pub async fn async_http_request(
     message_string.push_str(format!("{:#?}\n", body_as_json).as_ref());
     log::debug!("{message_string}");
     Ok(response)
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct LoginCacheData {
-    pub pkce_code_verifier: String,
-    pub session_metadata: SessionMetadata,
-}
-
-impl LoginCacheData {}
-
-impl FromRedisValue for LoginCacheData {
-    fn from_redis_value(value: &RedisValue) -> RedisResult<LoginCacheData> {
-        match *value {
-            RedisValue::Data(ref data) => Ok(serde_json::from_slice::<LoginCacheData>(data)?),
-            _ => Err(RedisError::from((
-                ErrorKind::TypeError,
-                "Response was of incompatible type",
-                format!("(response was {:?})", value),
-            ))),
-        }
-    }
 }

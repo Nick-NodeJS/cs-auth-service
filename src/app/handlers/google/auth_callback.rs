@@ -7,6 +7,7 @@ use crate::app::{
     app_data::AppData,
     app_error::AppError,
     models::user::UserProfile,
+    providers::common::parse_callback_query_string,
     services::common::{error_as_json, result_as_json},
 };
 
@@ -16,12 +17,16 @@ pub async fn auth_callback(
 ) -> Result<HttpResponse, AppError> {
     let mut google_service = app_data.google_service.lock()?;
     let mut user_service = app_data.user_service.lock()?;
-    let (code, state) = google_service.parse_auth_query_string(req.query_string())?;
+    let callback_query_data = parse_callback_query_string(req.query_string())?;
 
-    let login_cache_data = google_service.get_pkce_code_verifier(&state)?;
+    let login_cache_data =
+        google_service.get_login_cache_data_by_state(&callback_query_data.state)?;
     // process code and state to get tokens
     let tokens = google_service
-        .get_tokens(code, login_cache_data.pkce_code_verifier)
+        .get_tokens(
+            callback_query_data.code,
+            login_cache_data.pkce_code_verifier,
+        )
         .await?;
 
     let user_profile = google_service

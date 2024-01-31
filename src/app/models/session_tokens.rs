@@ -34,6 +34,7 @@ impl SessionTokens {
                     && self.refresh_token.is_some()
                     && self.extra_token.is_some()
             }
+            AuthProviders::Facebook => self.access_token.is_some(),
             // TODO: check if it's corect in next Auth Provider implementations
             _ => self.access_token.is_some() && self.refresh_token.is_some(),
         }

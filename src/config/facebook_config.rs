@@ -10,7 +10,7 @@ pub struct FacebookConfig {
     pub facebook_token_url: String,
     pub facebook_revoke_url: String,
     pub facebook_redirect_url: String,
-    pub facebook_userinfo_url: String,
+    pub facebook_graph_url: String,
     pub facebook_cache_state_ttl_sec: u64,
     pub facebook_debug_token_url: String,
 }
@@ -34,8 +34,8 @@ impl FacebookConfig {
             .expect("Missing the FACEBOOK_REVOKE_URL environment variable.");
         let facebook_redirect_url = dotenv::var("FACEBOOK_REDIRECT_URL")
             .expect("Missing the FACEBOOK_REDIRECT_URL environment variable.");
-        let facebook_userinfo_url = dotenv::var("FACEBOOK_USERINFO_URL")
-            .expect("Missing the FACEBOOK_USERINFO_URL environment variable.");
+        let facebook_graph_url = dotenv::var("FACEBOOK_GRAPH_URL")
+            .expect("Missing the FACEBOOK_GRAPH_URL environment variable.");
         let facebook_cache_state_ttl_sec: u64 = dotenv::var("FACEBOOK_STATE_CACHE_TTL_SEC")
             .expect("FACEBOOK_STATE_CACHE_TTL_SEC environment variable is not set")
             .parse()
@@ -55,7 +55,7 @@ impl FacebookConfig {
             facebook_debug_token_url,
             facebook_revoke_url,
             facebook_redirect_url,
-            facebook_userinfo_url,
+            facebook_graph_url,
             facebook_cache_state_ttl_sec,
         }
     }

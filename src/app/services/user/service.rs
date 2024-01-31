@@ -96,6 +96,14 @@ impl UserService {
         Ok(user)
     }
 
+    pub async fn get_user_by_id(
+        &mut self,
+        user_id: &ObjectId,
+    ) -> Result<Option<User>, UserServiceError> {
+        let user = self.user_repository.find_user_by_id(user_id).await?;
+        Ok(user)
+    }
+
     pub async fn set_new_session(
         &mut self,
         new_session_data: NewSessionData,

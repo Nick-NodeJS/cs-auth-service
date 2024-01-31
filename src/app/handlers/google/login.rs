@@ -1,8 +1,6 @@
 use crate::app::{
-    app_data::AppData,
-    app_error::AppError,
-    models::session_metadata::SessionMetadata,
-    services::common::{auth_url_as_json, LoginCacheData},
+    app_data::AppData, app_error::AppError, models::session_metadata::SessionMetadata,
+    providers::common::LoginCacheData, services::common::auth_url_as_json,
 };
 use actix_web::{web, HttpRequest, HttpResponse};
 

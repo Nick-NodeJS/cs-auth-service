@@ -13,9 +13,9 @@ pub async fn login(
     let mut session_metadata = SessionMetadata::new();
     session_metadata.set_metadata_from_request(&req);
     // Generate the authorization URL and params to verify it in next
-    let mut facebook_service = app_data.facebook_service.lock()?;
+    let mut facebook_provider = app_data.facebook_provider.lock()?;
 
-    let auth_url = facebook_service.get_authorization_url_data(session_metadata)?;
+    let auth_url = facebook_provider.get_authorization_url_data(session_metadata)?;
 
     Ok(HttpResponse::Ok().json(auth_url_as_json(&auth_url)))
 }

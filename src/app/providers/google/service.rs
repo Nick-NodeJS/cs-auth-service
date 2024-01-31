@@ -1,13 +1,11 @@
-use chrono::{DateTime, Duration, Utc};
-use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 use std::str::FromStr;
 
 use actix_web::http::Method;
-use actix_web::web;
 use awc::error::HeaderValue;
 use base64::Engine;
 use jsonwebtoken as jwt;
-use jwt::{decode, Algorithm, DecodingKey, TokenData, Validation};
+use jwt::DecodingKey;
 use oauth2::http::HeaderMap;
 
 use oauth2::basic::BasicClient;
@@ -20,15 +18,16 @@ use oauth2::{
 use crate::app::models::session_tokens::SessionTokens;
 use crate::app::models::token::Token;
 use crate::app::models::user::GoogleProfile;
+use crate::app::providers::common::{get_login_cache_data_by_state, LoginCacheData};
+use crate::app::providers::google::common::decode_token;
 use crate::app::services::cache::service::RedisCacheService;
-use crate::app::services::common::{
-    async_http_request, get_x_www_form_headers, AsyncFn, LoginCacheData,
-};
+use crate::app::services::common::{async_http_request, get_x_www_form_headers, AsyncFn};
 use crate::config::google_config::GoogleConfig;
 
 use super::super::error::ProviderError;
 use super::common::{
-    GoogleCert, GoogleKeys, GoogleTokenResponse, TokenClaims, TokenHeaderObject, UserInfo,
+    get_decoding_key_from_vec_cert, get_session_tokens, GoogleCert, GoogleKeys,
+    GoogleTokenResponse, TokenHeaderObject, UserInfo,
 };
 use super::error::GoogleServiceError;
 
@@ -129,17 +128,12 @@ impl GoogleService {
         Ok(())
     }
 
-    pub fn get_pkce_code_verifier(&mut self, state: &str) -> Result<LoginCacheData, ProviderError> {
-        // process code and state
-        let login_cache_data_value = self
-            .cache_service
-            .get_value::<LoginCacheData>(state.clone().as_ref())?;
-        if let Some(login_cache_data) = login_cache_data_value {
-            Ok(login_cache_data)
-        } else {
-            log::debug!("No callback request state {} in Redis", state);
-            return Err(ProviderError::CallbackStateCacheError);
-        }
+    pub fn get_login_cache_data_by_state(
+        &mut self,
+        state: &str,
+    ) -> Result<LoginCacheData, ProviderError> {
+        // Every provider has its own cache database
+        get_login_cache_data_by_state(&self.cache_service, state)
     }
 
     /// It makes http request to GAPI and gets access token and refresh token.
@@ -268,35 +262,6 @@ impl GoogleService {
         });
     }
 
-    /// get code and state params from query string
-    pub fn parse_auth_query_string(
-        &self,
-        query_string: &str,
-    ) -> Result<(String, String), ProviderError> {
-        let try_params = web::Query::<HashMap<String, String>>::from_query(query_string);
-        match try_params {
-            Ok(params) => {
-                let code: String;
-                if let Some(code_string) = params.get("code") {
-                    code = code_string.to_owned();
-                } else {
-                    return Err(ProviderError::CodeParamError);
-                };
-                let state: String;
-                if let Some(state_string) = params.get("state") {
-                    state = state_string.to_owned();
-                } else {
-                    return Err(ProviderError::CodeParamError);
-                };
-                return Ok((code, state));
-            }
-            Err(err) => {
-                log::error!("{}", err.to_string());
-                return Err(ProviderError::QueryStringError);
-            }
-        }
-    }
-
     pub async fn logout(&self, tokens: SessionTokens) -> Result<(), ProviderError> {
         if let Some(token) = tokens.refresh_token {
             self.revoke_token(token.token_string.as_ref()).await
@@ -396,67 +361,5 @@ impl GoogleService {
         let jwt_keys = serde_json::from_slice::<GoogleKeys>(&jwks_response.body)?;
 
         Ok((jwt_keys.keys, cert_expires_datetime))
-    }
-}
-
-pub fn get_session_tokens(tokens: GoogleTokenResponse) -> SessionTokens {
-    let expire = Some(Utc::now() + Duration::seconds(tokens.expires_in));
-    let refresh_token = match tokens.refresh_token {
-        Some(token) => Some(Token {
-            token_string: token,
-            expire: None,
-        }),
-        None => None,
-    };
-    SessionTokens {
-        access_token: Some(Token {
-            token_string: tokens.id_token,
-            expire,
-        }),
-        refresh_token,
-        extra_token: Some(Token {
-            token_string: tokens.access_token,
-            expire,
-        }),
-    }
-}
-
-pub fn decode_token(
-    token: &str,
-    key: &DecodingKey,
-    check_expiration: bool,
-) -> Result<TokenClaims, ProviderError> {
-    // Validation configuration
-    let mut validation = Validation::new(Algorithm::RS256);
-    if !check_expiration {
-        validation.validate_exp = false;
-    }
-
-    let token_data: TokenData<TokenClaims> = match decode(token, key, &validation) {
-        Ok(data) => data,
-        Err(err) => {
-            log::warn!("Decode Error: {}\n token: {}\n", err, token);
-            return Err(ProviderError::JWTDecodingError);
-        }
-    };
-
-    Ok(token_data.claims)
-}
-
-pub fn get_decoding_key_from_vec_cert(
-    certs: Vec<GoogleCert>,
-    kid: String,
-) -> Result<Option<DecodingKey>, ProviderError> {
-    let cert = certs.clone().into_iter().find(|c| c.kid == kid);
-    if let Some(certificate) = cert {
-        let key = DecodingKey::from_rsa_components(&certificate.n, &certificate.e)?;
-        Ok(Some(key.clone()))
-    } else {
-        log::error!(
-            "No certificate found in cache for kid: {}. Certificates: {:?}",
-            kid,
-            &certs
-        );
-        Ok(None)
     }
 }
