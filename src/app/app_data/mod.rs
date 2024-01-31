@@ -6,7 +6,7 @@ use crate::config::{
 
 use super::{
     app_error::AppError,
-    providers::{facebook::provider::FacebookProvider, google::service::GoogleService},
+    providers::{facebook::provider::FacebookProvider, google::provider::GoogleProvider},
     services::{
         cache::{common::CacheServiceType, service::RedisCacheService},
         common::async_http_request,
@@ -18,7 +18,7 @@ use super::{
 #[derive(Clone)]
 pub struct AppData {
     pub facebook_provider: Arc<Mutex<FacebookProvider>>,
-    pub google_service: Arc<Mutex<GoogleService>>,
+    pub google_provider: Arc<Mutex<GoogleProvider>>,
     pub user_service: Arc<Mutex<UserService>>,
 }
 
@@ -53,13 +53,13 @@ impl AppData {
         let google_config = GoogleConfig::new();
 
         // let request = async_http_request;
-        let mut google_service = GoogleService::new(
+        let mut google_provider = GoogleProvider::new(
             Box::new(async_http_request),
             google_config,
             google_cache_service,
         );
 
-        google_service.init().await?;
+        google_provider.init().await?;
 
         let user_config = UserConfig::new();
 
@@ -73,7 +73,7 @@ impl AppData {
 
         let app_data = AppData {
             facebook_provider: Arc::new(Mutex::new(facebook_provider)),
-            google_service: Arc::new(Mutex::new(google_service)),
+            google_provider: Arc::new(Mutex::new(google_provider)),
             user_service: Arc::new(Mutex::new(user_service)),
         };
         Ok(app_data)

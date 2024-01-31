@@ -15,8 +15,8 @@ pub async fn logout(
     if !session.is_anonymous() {
         match session.auth_provider {
             AuthProviders::Google => {
-                let google_service = app_data.google_service.lock()?;
-                google_service.logout(session.tokens.clone()).await?;
+                let google_provider = app_data.google_provider.lock()?;
+                google_provider.logout(session.tokens.clone()).await?;
             }
             AuthProviders::Facebook => {
                 let mut user_service = app_data.user_service.lock()?;

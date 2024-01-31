@@ -8,15 +8,15 @@ use thiserror::Error;
 
 use crate::app::services::cache::error::CacheServiceError;
 
-use super::{facebook::error::FacebookServiceError, google::error::GoogleServiceError};
+use super::{facebook::error::FacebookProviderError, google::error::GoogleProviderError};
 
 #[derive(Debug, Error)]
 pub enum ProviderError {
     #[error("Google Service error: {0}")]
-    FacebookServiceError(#[from] FacebookServiceError),
+    FacebookProviderError(#[from] FacebookProviderError),
 
     #[error("Google Service error: {0}")]
-    GoogleServiceError(#[from] GoogleServiceError),
+    GoogleProviderError(#[from] GoogleProviderError),
 
     #[error("CacheService error: {0}")]
     CacheServiceError(#[from] CacheServiceError),
@@ -62,11 +62,6 @@ pub enum ProviderError {
 
     #[error("Base64 decode error")]
     Base64DecodeError,
-
-    // #[error("OAuth2 certificates response has no expires header")]
-    // OAuth2CertificatesResponse,
-    #[error("Revoke request error")]
-    RevokeRequestError,
 
     #[error("HeaderToStr error")]
     HeaderToStrError,

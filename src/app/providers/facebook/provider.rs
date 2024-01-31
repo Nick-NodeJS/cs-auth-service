@@ -19,6 +19,7 @@ use super::common::{
     get_session_tokens, FacebookTokenResponse, FacebookUserDeleteResponse, FacebookUserInfo,
     TokenData as FacebookTokenData, TokenDebugData, USER_PROFILE_FIELDS,
 };
+use super::error::FacebookProviderError;
 
 pub struct FacebookProvider {
     async_http_request: Box<dyn AsyncFn>,
@@ -273,14 +274,18 @@ impl FacebookProvider {
             .map_err(|err| format!("Get token request error: {err}"))?;
 
         if !response.status_code.is_success() {
-            return Err(ProviderError::RevokeRequestError);
+            return Err(ProviderError::FacebookProviderError(
+                FacebookProviderError::DeletePermissionsRequestError,
+            ));
         }
 
         let response = serde_json::from_slice::<FacebookUserDeleteResponse>(&response.body)?;
 
         match response.success.is_some() {
             true => Ok(()),
-            _ => Err(ProviderError::RevokeRequestError),
+            _ => Err(ProviderError::FacebookProviderError(
+                FacebookProviderError::DeletePermissionsRequestError,
+            )),
         }
     }
 }

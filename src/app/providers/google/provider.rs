@@ -29,21 +29,21 @@ use super::common::{
     get_decoding_key_from_vec_cert, get_session_tokens, GoogleCert, GoogleKeys,
     GoogleTokenResponse, TokenHeaderObject, UserInfo,
 };
-use super::error::GoogleServiceError;
+use super::error::GoogleProviderError;
 
-pub struct GoogleService {
+pub struct GoogleProvider {
     async_http_request: Box<dyn AsyncFn>,
     cache_service: RedisCacheService,
     config: GoogleConfig,
 }
 
-impl GoogleService {
+impl GoogleProvider {
     pub fn new(
         request: Box<dyn AsyncFn>,
         config: GoogleConfig,
         cache_service: RedisCacheService,
     ) -> Self {
-        GoogleService {
+        GoogleProvider {
             async_http_request: request,
             cache_service,
             config,
@@ -285,11 +285,15 @@ impl GoogleService {
             Ok(response) => response,
             Err(err) => {
                 log::error!("Google revoke token request error: {}", err);
-                return Err(ProviderError::RevokeRequestError);
+                return Err(ProviderError::GoogleProviderError(
+                    GoogleProviderError::RevokeRequestError,
+                ));
             }
         };
         if !revoke_response.status_code.is_success() {
-            return Err(ProviderError::RevokeRequestError);
+            return Err(ProviderError::GoogleProviderError(
+                GoogleProviderError::RevokeRequestError,
+            ));
         }
         log::debug!("Revoked Google token {} successfuly", token);
         Ok(())
@@ -341,8 +345,8 @@ impl GoogleService {
         {
             Ok(response) => response,
             Err(_) => {
-                return Err(ProviderError::GoogleServiceError(
-                    GoogleServiceError::OAuth2CertificatesResponse,
+                return Err(ProviderError::GoogleProviderError(
+                    GoogleProviderError::OAuth2CertificatesResponse,
                 ));
             }
         };
@@ -350,8 +354,8 @@ impl GoogleService {
         let cert_expires = match jwks_response.headers.get("expires") {
             Some(value) => value.to_str()?,
             None => {
-                return Err(ProviderError::GoogleServiceError(
-                    GoogleServiceError::OAuth2CertificatesResponse,
+                return Err(ProviderError::GoogleProviderError(
+                    GoogleProviderError::OAuth2CertificatesResponse,
                 ))
             }
         };

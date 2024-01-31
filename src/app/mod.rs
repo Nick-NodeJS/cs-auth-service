@@ -78,11 +78,7 @@ pub async fn run() -> std::io::Result<()> {
                                 .route("/logout", web::get().to(logout)),
                         ),
                     )
-                    .route("/status", web::get().to(status)), // .service(
-                                                              //     web::scope("/users")
-                                                              //     .wrap(authentication_middleware)
-                                                              //     .route("/me", web::get().to(user_profile))
-                                                              // )
+                    .route("/status", web::get().to(status)),
             )
     })
     .bind(server_address_with_port)?

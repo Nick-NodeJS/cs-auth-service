@@ -15,21 +15,21 @@ pub async fn auth_callback(
     req: HttpRequest,
     app_data: web::Data<AppData>,
 ) -> Result<HttpResponse, AppError> {
-    let mut google_service = app_data.google_service.lock()?;
+    let mut google_provider = app_data.google_provider.lock()?;
     let mut user_service = app_data.user_service.lock()?;
     let callback_query_data = parse_callback_query_string(req.query_string())?;
 
     let login_cache_data =
-        google_service.get_login_cache_data_by_state(&callback_query_data.state)?;
+        google_provider.get_login_cache_data_by_state(&callback_query_data.state)?;
     // process code and state to get tokens
-    let tokens = google_service
+    let tokens = google_provider
         .get_tokens(
             callback_query_data.code,
             login_cache_data.pkce_code_verifier,
         )
         .await?;
 
-    let user_profile = google_service
+    let user_profile = google_provider
         .get_user_profile(tokens.access_token.clone())
         .await?;
 
@@ -56,7 +56,7 @@ pub async fn auth_callback(
             user_profile.user_id
         );
         if let Some(token) = tokens.extra_token {
-            google_service
+            google_provider
                 .revoke_token(token.token_string.as_ref())
                 .await?;
         }

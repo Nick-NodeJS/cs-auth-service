@@ -18,16 +18,16 @@ pub async fn login(
     let mut session_metadata = SessionMetadata::new();
     session_metadata.set_metadata_from_request(&req);
     // Generate the authorization URL and params to verify it in next
-    let mut google_service = app_data.google_service.lock()?;
+    let mut google_provider = app_data.google_provider.lock()?;
     let (authorize_url, csrf_state, pkce_code_verifier) =
-        google_service.get_authorization_url_data();
+        google_provider.get_authorization_url_data();
 
     // set auth data in cache
     let login_cache_data = LoginCacheData {
         pkce_code_verifier,
         session_metadata,
     };
-    google_service.set_auth_data_to_cache(csrf_state.secret().as_ref(), &login_cache_data)?;
+    google_provider.set_auth_data_to_cache(csrf_state.secret().as_ref(), &login_cache_data)?;
 
     Ok(HttpResponse::Ok().json(auth_url_as_json(authorize_url.as_ref())))
 }
