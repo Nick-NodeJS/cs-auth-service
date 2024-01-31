@@ -1,13 +1,8 @@
 use crate::app::{
     app_data::AppData, app_error::AppError, models::session_metadata::SessionMetadata,
-    providers::common::LoginCacheData, services::common::auth_url_as_json,
+    services::common::auth_url_as_json,
 };
 use actix_web::{web, HttpRequest, HttpResponse};
-
-/**
- * TODO:
- * - handle error with location
- */
 
 /// return Google Auth URL as json
 pub async fn login(
@@ -18,16 +13,9 @@ pub async fn login(
     let mut session_metadata = SessionMetadata::new();
     session_metadata.set_metadata_from_request(&req);
     // Generate the authorization URL and params to verify it in next
-    let mut google_provider = app_data.google_provider.lock()?;
-    let (authorize_url, csrf_state, pkce_code_verifier) =
-        google_provider.get_authorization_url_data();
+    let mut facebook_provider = app_data.facebook_provider.lock()?;
 
-    // set auth data in cache
-    let login_cache_data = LoginCacheData {
-        pkce_code_verifier,
-        session_metadata,
-    };
-    google_provider.set_auth_data_to_cache(csrf_state.secret().as_ref(), &login_cache_data)?;
+    let auth_url = facebook_provider.get_authorization_url_data(session_metadata)?;
 
-    Ok(HttpResponse::Ok().json(auth_url_as_json(authorize_url.as_ref())))
+    Ok(HttpResponse::Ok().json(auth_url_as_json(&auth_url)))
 }

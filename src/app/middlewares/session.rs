@@ -74,6 +74,7 @@ where
         let configuration = Rc::clone(&self.configuration);
 
         Box::pin(async move {
+            // TODO: update session middleware logic to keep anonymous user sessions on every endpoint
             if let Some(session_key) =
                 SessionService::get_cookie_session_id(&configuration.cookie_config, &req)
             {

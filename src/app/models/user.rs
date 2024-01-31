@@ -33,8 +33,9 @@ pub struct GoogleProfile {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FacebookProfile {
     pub user_id: String,
-    pub name: Option<String>,
+    pub name: String,
     pub email: Option<String>,
+    pub picture: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

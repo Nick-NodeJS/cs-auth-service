@@ -15,54 +15,50 @@ pub async fn auth_callback(
     req: HttpRequest,
     app_data: web::Data<AppData>,
 ) -> Result<HttpResponse, AppError> {
-    let mut google_provider = app_data.google_provider.lock()?;
-    let mut user_service = app_data.user_service.lock()?;
     let callback_query_data = parse_callback_query_string(req.query_string())?;
 
+    let mut user_service = app_data.user_service.lock()?;
+    let mut facebook_provider = app_data.facebook_provider.lock()?;
+
+    // It's critical to get LoginCacheData before tokens getting by code!!!
+    // this way it checks if state is valid
     let login_cache_data =
-        google_provider.get_login_cache_data_by_state(&callback_query_data.state)?;
-    // process code and state to get tokens
-    let tokens = google_provider
-        .get_tokens(
-            callback_query_data.code,
-            login_cache_data.pkce_code_verifier,
-        )
+        facebook_provider.get_login_cache_data_by_state(&callback_query_data.state)?;
+
+    let tokens = facebook_provider
+        .get_tokens(&callback_query_data.code)
         .await?;
 
-    let user_profile = google_provider
-        .get_user_profile(tokens.access_token.clone())
-        .await?;
+    let user_profile = facebook_provider.get_user_profile(&tokens).await?;
 
     if let Some(user_session) = user_service
         .get_user_session(
-            tokens.clone(),
-            UserProfile::Google(user_profile.clone()),
+            tokens,
+            UserProfile::Facebook(user_profile.clone()),
             login_cache_data.session_metadata,
         )
         .await?
     {
         log::debug!(
-            "User {} loged in with Google successfuly",
+            "User {} loged in with Facebook successfuly",
             user_session.user_id
         );
-        // TODO: set session token to cookie
         let mut response = HttpResponse::Ok().json(result_as_json("success"));
         user_service.set_session_cookie(response.head_mut(), user_session.id)?;
 
         Ok(response)
     } else {
         log::warn!(
-            "\nGoogle user_id: {} has no data in system. Should relogin\n",
+            "\nFacebook user_id: {} has no data in system. Should relogin\n",
             user_profile.user_id
         );
-        if let Some(token) = tokens.extra_token {
-            google_provider
-                .revoke_token(token.token_string.as_ref())
-                .await?;
-        }
+        // if let Some(token) = tokens.extra_token {
+        //     google_service
+        //         .revoke_token(token.token_string.as_ref())
+        //         .await?;
+        // }
         // TODO: investigate if it's better for UX to pass throw login to return auth_url on this step
-        return Ok(
-            HttpResponse::Unauthorized().json(error_as_json("User should relogin to Google"))
-        );
+        Ok(HttpResponse::Unauthorized().json(error_as_json("User should relogin to Facebook")))
     }
+    // Ok(HttpResponse::Ok().json(result_as_json("success")))
 }
