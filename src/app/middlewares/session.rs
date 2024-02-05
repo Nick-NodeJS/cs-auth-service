@@ -9,6 +9,7 @@ use actix_web::{
 
 use crate::{
     app::{
+        common::api_path::LOGOUT,
         models::session::Session,
         services::{session::service::SessionService, traits::session_storage::SessionStorage},
     },
@@ -109,6 +110,8 @@ where
             };
 
             req.extensions_mut().insert(session.clone());
+            // Need to exclude only once the case when user /logout
+            let is_restricted = req.path().contains(LOGOUT) && !session.is_anonymous();
 
             let mut res = service.call(req).await?;
 
@@ -118,7 +121,7 @@ where
                 .cookies()
                 .into_iter()
                 .find(|cookie| cookie.name() == &configuration.cookie_config.name);
-            if session_cookie.is_none() {
+            if session_cookie.is_none() && !is_restricted {
                 if let Err(err) = storage
                     .as_ref()
                     .set(&session, configuration.session_ttl_sec)
