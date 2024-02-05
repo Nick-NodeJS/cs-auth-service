@@ -79,13 +79,17 @@ impl Session {
         format!("user::sessions::{}", user_id)
     }
 
-    pub fn get_anonymous_session() -> Session {
+    pub fn get_anonymous_session(req: Option<&HttpRequest>) -> Session {
+        let mut session_metadata = SessionMetadata::new();
+        if let Some(request) = req {
+            session_metadata.set_metadata_from_request(request);
+        }
         Session::new(NewSessionData {
             anonimous: true,
             auth_provider: AuthProviders::CyberSherlock,
             user_id: ObjectId::new(),
             tokens: SessionTokens::empty_tokens(),
-            session_metadata: SessionMetadata::new(),
+            session_metadata,
         })
     }
 
@@ -93,7 +97,7 @@ impl Session {
         if let Some(session) = req.extensions_mut().get::<Session>() {
             session.to_owned()
         } else {
-            Session::get_anonymous_session()
+            Session::get_anonymous_session(None)
         }
     }
 }

@@ -184,13 +184,13 @@ impl UserService {
 
     pub fn set_session_cookie(
         &self,
-        response: &mut ResponseHead,
-        session_id: String,
+        response_head: &mut ResponseHead,
+        session: &Session,
     ) -> Result<(), UserServiceError> {
         Ok(SessionService::set_cookie_session_id(
             &self.session_service.config.cookie_config,
-            response,
-            session_id,
+            response_head,
+            session.id.clone(),
         )?)
     }
 

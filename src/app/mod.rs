@@ -1,5 +1,6 @@
 pub mod app_data;
 pub mod app_error;
+pub mod common;
 pub mod handlers;
 pub mod middlewares;
 pub mod models;
@@ -10,6 +11,9 @@ pub mod services;
 use actix_web::{middleware::Logger, web, App, HttpServer};
 
 use crate::app::app_data::AppData;
+use crate::app::common::api_path::{
+    API, AUTH, CALLBACK, FACEBOOK, GOOGLE, LOGIN, LOGOUT, STATUS, V1,
+};
 use crate::app::handlers::logout::logout;
 use crate::app::middlewares::session::SessionMiddleware;
 use crate::app::services::cache::common::CacheServiceType;
@@ -57,29 +61,29 @@ pub async fn run() -> std::io::Result<()> {
             .wrap(Logger::default())
             .app_data(web::Data::new(app_data.clone()))
             .service(
-                web::scope("/api")
-                    .service(
-                        web::scope("/v1").service(
-                            web::scope("/auth")
+                web::scope(API).service(
+                    web::scope(V1)
+                        .wrap(SessionMiddleware::new(
+                            session_cache_service.clone(),
+                            SessionConfig::new(),
+                        ))
+                        .service(
+                            web::scope(AUTH)
                                 .service(
-                                    web::scope("/facebook")
-                                        .route("/login", web::get().to(login_with_facebook))
-                                        .route("/callback", web::get().to(facebook_auth_callback)),
+                                    web::scope(FACEBOOK)
+                                        .route(LOGIN, web::get().to(login_with_facebook))
+                                        .route(CALLBACK, web::get().to(facebook_auth_callback)),
                                 )
                                 .service(
-                                    web::scope("/google")
-                                        .route("/login", web::get().to(login_with_google))
-                                        .route("/callback", web::get().to(google_auth_callback)),
+                                    web::scope(GOOGLE)
+                                        .route(LOGIN, web::get().to(login_with_google))
+                                        .route(CALLBACK, web::get().to(google_auth_callback)),
                                 )
-                                .wrap(SessionMiddleware::new(
-                                    session_cache_service.clone(),
-                                    SessionConfig::new(),
-                                ))
-                                .route("/logout", web::get().to(logout)),
+                                .route(LOGOUT, web::get().to(logout)),
                         ),
-                    )
-                    .route("/status", web::get().to(status)),
+                ),
             )
+            .route(STATUS, web::get().to(status))
     })
     .bind(server_address_with_port)?
     .run()

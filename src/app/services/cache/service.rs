@@ -40,14 +40,14 @@ impl RedisCacheService {
         serde_json::to_string::<T>(data)
     }
 
-    pub fn set(&mut self, key: &str, items: (&str, String)) -> Result<(), CacheServiceError> {
+    pub fn set(&self, key: &str, items: (&str, String)) -> Result<(), CacheServiceError> {
         let mut connection = self.get_connection()?;
         connection.hset(key, items.0, items.1)?;
         Ok(())
     }
 
     pub fn get_all_set_values(
-        &mut self,
+        &self,
         key: &str,
     ) -> Result<HashMap<String, String>, CacheServiceError> {
         let mut connection = self.get_connection()?;
@@ -55,7 +55,7 @@ impl RedisCacheService {
         Ok(result)
     }
 
-    pub fn delete_values(&mut self, keys: Vec<String>) -> Result<(), CacheServiceError> {
+    pub fn delete_values(&self, keys: Vec<String>) -> Result<(), CacheServiceError> {
         let mut connection = self.get_connection()?;
         let mut cmd = Cmd::new();
         cmd.arg("DEL");
@@ -67,7 +67,7 @@ impl RedisCacheService {
     }
 
     pub fn delete_set_values(
-        &mut self,
+        &self,
         hset_key: &str,
         keys: Vec<String>,
     ) -> Result<(), CacheServiceError> {
@@ -90,7 +90,7 @@ impl RedisCacheService {
         Ok(value)
     }
 
-    pub fn get_values<T>(&mut self, keys: Vec<String>) -> Result<Vec<Option<T>>, CacheServiceError>
+    pub fn get_values<T>(&self, keys: Vec<String>) -> Result<Vec<Option<T>>, CacheServiceError>
     where
         T: FromRedisValue,
     {
@@ -100,7 +100,7 @@ impl RedisCacheService {
     }
 
     pub fn set_value_with_ttl<T>(
-        &mut self,
+        &self,
         key: &str,
         value: T,
         seconds: u64,
@@ -117,5 +117,10 @@ impl RedisCacheService {
 impl SessionStorage for RedisCacheService {
     fn load(&self, key: &str) -> Result<Option<Session>, CacheServiceError> {
         self.get_value::<Session>(&Session::get_session_key(key).as_ref())
+    }
+
+    fn set(&self, session: &Session, ttl: u64) -> Result<(), CacheServiceError> {
+        let session_key = Session::get_session_key(&session.id);
+        self.set_value_with_ttl(&session_key, session, ttl)
     }
 }
