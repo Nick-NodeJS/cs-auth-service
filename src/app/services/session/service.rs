@@ -81,7 +81,7 @@ impl SessionService {
 
     pub fn set_cookie_session_id(
         config: &CookieConfiguration,
-        response: &mut ResponseHead,
+        response_head: &mut ResponseHead,
         session_id: String,
     ) -> Result<(), SessionServiceError> {
         // it should gets session cookie with encrypted session id
@@ -109,7 +109,7 @@ impl SessionService {
         let val = HeaderValue::from_str(&cookie.encoded().to_string())
             .map_err(|_| SessionServiceError::SetCookieToResponseError)?;
 
-        response.headers_mut().append(SET_COOKIE, val);
+        response_head.headers_mut().append(SET_COOKIE, val);
 
         Ok(())
     }

@@ -57,9 +57,13 @@ pub async fn run() -> std::io::Result<()> {
             .wrap(Logger::default())
             .app_data(web::Data::new(app_data.clone()))
             .service(
-                web::scope("/api")
-                    .service(
-                        web::scope("/v1").service(
+                web::scope("/api").service(
+                    web::scope("/v1")
+                        .wrap(SessionMiddleware::new(
+                            session_cache_service.clone(),
+                            SessionConfig::new(),
+                        ))
+                        .service(
                             web::scope("/auth")
                                 .service(
                                     web::scope("/facebook")
@@ -71,15 +75,11 @@ pub async fn run() -> std::io::Result<()> {
                                         .route("/login", web::get().to(login_with_google))
                                         .route("/callback", web::get().to(google_auth_callback)),
                                 )
-                                .wrap(SessionMiddleware::new(
-                                    session_cache_service.clone(),
-                                    SessionConfig::new(),
-                                ))
                                 .route("/logout", web::get().to(logout)),
                         ),
-                    )
-                    .route("/status", web::get().to(status)),
+                ),
             )
+            .route("/status", web::get().to(status))
     })
     .bind(server_address_with_port)?
     .run()

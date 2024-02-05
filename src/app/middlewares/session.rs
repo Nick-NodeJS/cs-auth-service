@@ -8,7 +8,10 @@ use actix_web::{
 };
 
 use crate::{
-    app::services::{session::service::SessionService, traits::session_storage::SessionStorage},
+    app::{
+        models::session::Session,
+        services::{session::service::SessionService, traits::session_storage::SessionStorage},
+    },
     config::session_config::SessionConfig,
 };
 
@@ -75,27 +78,64 @@ where
 
         Box::pin(async move {
             // TODO: update session middleware logic to keep anonymous user sessions on every endpoint
+            let session: Session;
+            let (request_ref, _) = req.parts();
             if let Some(session_key) =
                 SessionService::get_cookie_session_id(&configuration.cookie_config, &req)
             {
                 log::debug!("Session Key: {}", session_key);
-                if let Some(session) = match storage.as_ref().load(&session_key) {
-                    Ok(try_session) => try_session,
+                session = match storage.as_ref().load(&session_key) {
+                    Ok(try_session) => match try_session {
+                        Some(s) => s,
+                        None => {
+                            log::debug!("No session in Cache Storage by Session Key {}. Set Anonymous Session", &session_key);
+                            Session::get_anonymous_session(Some(request_ref))
+                        }
+                    },
                     Err(err) => {
                         log::error!(
-                            "Unable to get user session from cache storage, session key: {}, error: {:?}",
+                            "Unable to get user session from cache storage by Session Key: {}, error: {:?}",
                             &session_key,
                             err
                         );
-                        None
+                        // it has an issue to get Session from CacheStorage by Session Key
+                        // set an anonymous Session
+                        Session::get_anonymous_session(Some(request_ref))
                     }
-                } {
-                    req.extensions_mut().insert(session);
-                };
+                }
+            } else {
+                log::debug!("No Session Key on request. Set Anonymous Session");
+                session = Session::get_anonymous_session(Some(request_ref));
             };
 
-            let res = service.call(req).await?;
+            req.extensions_mut().insert(session.clone());
 
+            let mut res = service.call(req).await?;
+
+            // TODO: set anonymous session on response if it has no session
+            let m_res = res.response_mut();
+            let session_cookie = m_res
+                .cookies()
+                .into_iter()
+                .find(|cookie| cookie.name() == &configuration.cookie_config.name);
+            if session_cookie.is_none() {
+                if let Err(err) = storage
+                    .as_ref()
+                    .set(&session, configuration.session_ttl_sec)
+                {
+                    log::error!(
+                        "Error to set session in Session Storage on Session Middleware: {:?}",
+                        err
+                    );
+                }
+                if let Err(err) = SessionService::set_cookie_session_id(
+                    &configuration.cookie_config,
+                    m_res.head_mut(),
+                    session.id.to_string(),
+                ) {
+                    log::error!("Error to set session cookie to response: {:?}", err);
+                }
+            }
             Ok(res)
         })
     }

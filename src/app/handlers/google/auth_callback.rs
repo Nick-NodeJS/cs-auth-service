@@ -43,11 +43,11 @@ pub async fn auth_callback(
     {
         log::debug!(
             "User {} loged in with Google successfuly",
-            user_session.user_id
+            &user_session.user_id
         );
         // TODO: set session token to cookie
         let mut response = HttpResponse::Ok().json(result_as_json("success"));
-        user_service.set_session_cookie(response.head_mut(), user_session.id)?;
+        user_service.set_session_cookie(response.head_mut(), &user_session)?;
 
         Ok(response)
     } else {
