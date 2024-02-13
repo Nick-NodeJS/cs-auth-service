@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
 pub struct AppConfig {
+    pub auth_callback_url: String,
     pub server_address: String,
     pub server_port: u16,
 }
@@ -30,7 +31,11 @@ impl AppConfig {
             panic!("Invalid server address");
         }
 
+        let auth_callback_url = dotenv::var("AUTH_CALLBACK_URL")
+            .expect("Missing the AUTH_CALLBACK_URL environment variable.");
+
         Self {
+            auth_callback_url,
             server_address,
             server_port,
             // Add other configuration settings here

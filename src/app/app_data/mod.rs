@@ -1,12 +1,16 @@
 use std::sync::{Arc, Mutex};
 
 use crate::config::{
-    facebook_config::FacebookConfig, google_config::GoogleConfig, user_config::UserConfig,
+    app_config::AppConfig, facebook_config::FacebookConfig, google_config::GoogleConfig,
+    user_config::UserConfig,
 };
 
 use super::{
     app_error::AppError,
-    providers::{facebook::provider::FacebookProvider, google::provider::GoogleProvider},
+    providers::{
+        cyber_sherlock::provider::CyberSherlockAuthProvider, facebook::provider::FacebookProvider,
+        google::provider::GoogleProvider, notification::provider::NotificationProvider,
+    },
     services::{
         cache::{common::CacheServiceType, service::RedisCacheService},
         common::async_http_request,
@@ -19,6 +23,7 @@ use super::{
 pub struct AppData {
     pub facebook_provider: Arc<Mutex<FacebookProvider>>,
     pub google_provider: Arc<Mutex<GoogleProvider>>,
+    pub cyber_sherlock_auth_provider: Arc<Mutex<CyberSherlockAuthProvider>>,
     pub user_service: Arc<Mutex<UserService>>,
 }
 
@@ -61,6 +66,19 @@ impl AppData {
 
         google_provider.init().await?;
 
+        let app_config = AppConfig::new();
+        // CyberSherlockAuth Cache service
+        let cyber_sherlock_auth_cache_service =
+            RedisCacheService::new(CacheServiceType::CyberSherlock)?;
+
+        let notification_provider = NotificationProvider::new(Box::new(async_http_request));
+
+        let cyber_sherlock_auth_provider = CyberSherlockAuthProvider::new(
+            app_config,
+            cyber_sherlock_auth_cache_service,
+            notification_provider,
+        );
+
         let user_config = UserConfig::new();
 
         let user_service = UserService::new(
@@ -72,6 +90,7 @@ impl AppData {
         .await?;
 
         let app_data = AppData {
+            cyber_sherlock_auth_provider: Arc::new(Mutex::new(cyber_sherlock_auth_provider)),
             facebook_provider: Arc::new(Mutex::new(facebook_provider)),
             google_provider: Arc::new(Mutex::new(google_provider)),
             user_service: Arc::new(Mutex::new(user_service)),

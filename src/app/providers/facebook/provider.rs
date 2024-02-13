@@ -63,7 +63,7 @@ impl FacebookProvider {
             ],
         )?;
 
-        // set auth data in cache
+        // set auth data to cache
         let login_cache_data = LoginCacheData {
             pkce_code_verifier: pkce_code_verifier.secret().to_string(),
             session_metadata,

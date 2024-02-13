@@ -1,39 +1,50 @@
 use std::sync::PoisonError;
 
-use actix_web::http;
-use actix_web_thiserror_derive::ResponseError;
+use actix_web::{error, http::header::ContentType, HttpResponse};
+// use actix_web_thiserror_derive::ResponseError;
 use log::error;
 use thiserror::Error;
+use validator::ValidationError;
 
 use super::{
     providers::error::ProviderError,
     services::{
-        cache::error::CacheServiceError, storage::error::StorageServiceError,
-        user::error::UserServiceError,
+        cache::error::CacheServiceError, common::error_as_json,
+        storage::error::StorageServiceError, user::error::UserServiceError,
     },
 };
 
-#[derive(Debug, Error, ResponseError)]
+#[derive(Debug, Error)]
 pub enum AppError {
-    #[response(reason = "Internal service error")]
+    // #[response(reason = "Internal service error")]
     #[error("Lock Mutex error")]
     LockError,
 
-    #[response(reason = "Internal service error")]
-    #[error("Provider Error: {0}")]
+    // #[response(reason = "Internal service error")]
+    #[error("{0}")]
     ProviderError(#[from] ProviderError),
 
-    #[response(reason = "Internal service error")]
-    #[error("UserService error: {0}")]
+    // #[response(reason = "Internal service error")]
+    #[error("{0}")]
     UserServiceError(#[from] UserServiceError),
 
-    #[response(reason = "Internal service error")]
-    #[error("StorageService error: {0}")]
+    // #[response(reason = "Internal service error")]
+    #[error("{0}")]
     StorageServiceError(#[from] StorageServiceError),
 
-    #[response(reason = "Internal service error")]
-    #[error("CacheService error: {0}")]
+    // #[response(reason = "Internal service error")]
+    #[error("{0}")]
     CacheServiceError(#[from] CacheServiceError),
+
+    #[error("{0}")]
+    ValidationError(String),
+}
+
+impl From<ValidationError> for AppError {
+    fn from(err: ValidationError) -> Self {
+        log::debug!("Validation error: {}", &err);
+        return AppError::ValidationError(err.to_string());
+    }
 }
 
 impl<T> From<PoisonError<T>> for AppError {
@@ -41,4 +52,17 @@ impl<T> From<PoisonError<T>> for AppError {
         log::debug!("Lock Mutex error: {}", err);
         return AppError::LockError;
     }
+}
+
+impl error::ResponseError for AppError {
+    fn error_response(&self) -> HttpResponse {
+        HttpResponse::build(self.status_code())
+            .insert_header(ContentType::json())
+            .json(error_as_json(self.to_string().as_ref()))
+    }
+    // fn status_code(&self) -> StatusCode {
+    //     match *self {
+    //         UserError::ValidationError { .. } => StatusCode::BAD_REQUEST,
+    //     }
+    // }
 }

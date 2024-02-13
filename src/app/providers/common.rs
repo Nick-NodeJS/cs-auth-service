@@ -47,8 +47,6 @@ pub struct LoginCacheData {
     pub session_metadata: SessionMetadata,
 }
 
-impl LoginCacheData {}
-
 impl FromRedisValue for LoginCacheData {
     fn from_redis_value(value: &RedisValue) -> RedisResult<LoginCacheData> {
         match *value {

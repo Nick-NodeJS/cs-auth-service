@@ -8,17 +8,23 @@ use thiserror::Error;
 
 use crate::app::services::cache::error::CacheServiceError;
 
-use super::{facebook::error::FacebookProviderError, google::error::GoogleProviderError};
+use super::{
+    cyber_sherlock::error::CyberSherlockAuthProviderError, facebook::error::FacebookProviderError,
+    google::error::GoogleProviderError,
+};
 
 #[derive(Debug, Error)]
 pub enum ProviderError {
-    #[error("Google Service error: {0}")]
+    #[error("{0}")]
+    CyberSherlockAuthProviderError(#[from] CyberSherlockAuthProviderError),
+
+    #[error("{0}")]
     FacebookProviderError(#[from] FacebookProviderError),
 
-    #[error("Google Service error: {0}")]
+    #[error("{0}")]
     GoogleProviderError(#[from] GoogleProviderError),
 
-    #[error("CacheService error: {0}")]
+    #[error("{0}")]
     CacheServiceError(#[from] CacheServiceError),
 
     #[error("JWT decoding error")]
@@ -33,7 +39,7 @@ pub enum ProviderError {
     #[error("Error")]
     Error,
 
-    #[error("No callback state in cache")]
+    #[error("No callback state in cache error")]
     CallbackStateCacheError,
 
     #[error("Token data response error")]
@@ -42,10 +48,10 @@ pub enum ProviderError {
     #[error("OAuth2 request token error")]
     OAuth2RequestTokenError,
 
-    #[error("Invalid query string")]
+    #[error("Invalid query string error")]
     QueryStringError,
 
-    #[error("Invalid code paramater")]
+    #[error("Invalid code paramater error")]
     CodeParamError,
 
     #[error("Error to parse Url string")]
@@ -57,7 +63,7 @@ pub enum ProviderError {
     #[error("FromUtf8Error")]
     FromUtf8Error,
 
-    #[error("Wrong token, unable to get header")]
+    #[error("Wrong token, unable to get header error")]
     BadTokenStructure,
 
     #[error("Base64 decode error")]

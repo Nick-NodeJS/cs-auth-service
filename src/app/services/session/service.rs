@@ -122,7 +122,7 @@ impl SessionService {
         let cookies = match request.cookies().ok() {
             Some(c) => c,
             None => {
-                log::warn!("No cookies on request, ignoring...");
+                log::debug!("No cookies on request, ignoring...");
 
                 return None;
             }
@@ -130,7 +130,7 @@ impl SessionService {
         let session_cookie = match cookies.iter().find(|&cookie| cookie.name() == config.name) {
             Some(c) => c,
             None => {
-                log::warn!("No session cookie on request, ignoring...");
+                log::debug!("No session cookie on request, ignoring...");
 
                 return None;
             }

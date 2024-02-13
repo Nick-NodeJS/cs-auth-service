@@ -10,6 +10,7 @@ pub struct RedisConfig {
     pub google_database: i16,
     pub session_database: i16,
     pub user_database: i16,
+    pub cyber_sherlock_auth_database: i16,
 }
 
 impl RedisConfig {
@@ -67,10 +68,20 @@ impl RedisConfig {
         let user_database = dotenv::var("REDIS_USER_DATABASE")
             .expect("REDIS_USER_DATABASE environment variable is not set")
             .parse()
-            .expect("Invalid Redis Session database");
+            .expect("Invalid Redis User database");
 
-        if !validate_integer_in_range(session_database, 0, 15) {
+        if !validate_integer_in_range(user_database, 0, 15) {
             panic!("Redis User database out of the range");
+        }
+
+        // Validate and parse the redis cyber_sherlock_auth_database database
+        let cyber_sherlock_auth_database = dotenv::var("REDIS_CYBER_SHERLOCK_AUTH_DATABASE")
+            .expect("REDIS_CYBER_SHERLOCK_AUTH_DATABASE environment variable is not set")
+            .parse()
+            .expect("Invalid Redis CyberSherlockAuth database");
+
+        if !validate_integer_in_range(cyber_sherlock_auth_database, 0, 15) {
+            panic!("Redis CyberSherlockAuth database out of the range");
         }
 
         Self {
@@ -80,6 +91,7 @@ impl RedisConfig {
             google_database,
             session_database,
             user_database,
+            cyber_sherlock_auth_database,
         }
     }
 

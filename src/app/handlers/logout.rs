@@ -1,12 +1,14 @@
 use actix_web::{web, HttpResponse};
-use serde_json::json;
 
 use crate::app::{
     app_data::AppData,
     app_error::AppError,
+    handlers::common::response::NO_USER_FOUND,
     models::{common::AuthProviders, session::Session},
-    services::common::error_as_json,
+    services::common::{error_as_json, result_as_json},
 };
+
+use super::common::response::SUCCESS;
 
 pub async fn logout(
     app_data: web::Data<AppData>,
@@ -27,7 +29,7 @@ pub async fn logout(
                             None => {
                                 log::debug!("No User Facebook Profile found on User: {:?} with active AuthProvider::Facebook, Session: {:?}", &user, &session);
                                 return Ok(HttpResponse::InternalServerError()
-                                    .json(error_as_json("No User found by Session")));
+                                    .json(error_as_json(NO_USER_FOUND)));
                             }
                         };
                         let mut facabook_provider = app_data.facebook_provider.lock()?;
@@ -35,8 +37,9 @@ pub async fn logout(
                     }
                     None => {
                         log::debug!("No User found by Session {:?}", &session);
-                        return Ok(HttpResponse::InternalServerError()
-                            .json(error_as_json("No User found by Session")));
+                        return Ok(
+                            HttpResponse::InternalServerError().json(error_as_json(NO_USER_FOUND))
+                        );
                     }
                 };
             }
@@ -45,5 +48,5 @@ pub async fn logout(
         let mut user_service = app_data.user_service.lock()?;
         user_service.logout_by_session(session).await?;
     }
-    Ok(HttpResponse::Ok().json(json!({"result": "successful"})))
+    Ok(HttpResponse::Ok().json(result_as_json(SUCCESS)))
 }
