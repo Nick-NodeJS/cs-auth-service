@@ -7,7 +7,7 @@ use crate::app::{
     app_data::AppData,
     app_error::AppError,
     handlers::common::response::{SUCCESS, USER_SHOULD_RELOGIN},
-    models::user::UserProfile,
+    models::user_profile::UserProfile,
     providers::common::parse_callback_query_string,
     services::common::{error_as_json, result_as_json},
 };
@@ -53,13 +53,7 @@ pub async fn auth_callback(
             "\nFacebook user_id: {} has no data in system. Should relogin to Facebook\n",
             user_profile.user_id
         );
-        // if let Some(token) = tokens.extra_token {
-        //     google_service
-        //         .revoke_token(token.token_string.as_ref())
-        //         .await?;
-        // }
         // TODO: investigate if it's better for UX to pass throw login to return auth_url on this step
         Ok(HttpResponse::Unauthorized().json(error_as_json(USER_SHOULD_RELOGIN)))
     }
-    // Ok(HttpResponse::Ok().json(result_as_json("success")))
 }

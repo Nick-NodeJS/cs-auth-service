@@ -4,7 +4,7 @@ use chrono::Utc;
 use mongodb::bson::{self, doc};
 use mongodb::Collection;
 
-use crate::app::models::user::{User, UserProfile};
+use crate::app::models::{user::User, user_profile::UserProfile};
 use crate::app::services::cache::service::RedisCacheService;
 use crate::app::services::storage::service::StorageService;
 use crate::config::user_config::UserConfig;
@@ -38,6 +38,22 @@ impl UserRepository {
             return Ok(Some(user));
         };
         self.get_user_by_id_from_storage(user_id).await
+    }
+
+    pub async fn find_user_by_email(
+        &self,
+        email: &str,
+    ) -> Result<Option<User>, UserRepositoryError> {
+        let filter = get_find_user_by_email_query(email);
+        self.find_one(filter).await
+    }
+
+    pub async fn find_user_by_phone(
+        &self,
+        email: &str,
+    ) -> Result<Option<User>, UserRepositoryError> {
+        let filter = get_find_user_by_phone_query(email);
+        self.find_one(filter).await
     }
 
     pub async fn find_user_by_profile(
@@ -222,5 +238,27 @@ fn get_find_user_by_profile_query(user_profile: UserProfile) -> Document {
 fn get_find_user_by_id_query(user_id: &ObjectId) -> Document {
     doc! {
         "_id": user_id
+    }
+}
+
+fn get_find_user_by_email_query(email: &str) -> Document {
+    doc! {
+        "$or": [
+            doc! {
+                "cybersherlock.email": email
+            },
+            doc! {
+                "google.email": email
+            },
+            doc! {
+                "facebook.email": email
+            }
+        ]
+    }
+}
+
+fn get_find_user_by_phone_query(phone: &str) -> Document {
+    doc! {
+        "cybersherlock.phone": phone
     }
 }

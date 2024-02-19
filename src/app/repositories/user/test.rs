@@ -2,7 +2,7 @@
 mod tests {
     use crate::{
         app::{
-            models::user::UserProfile,
+            models::user_profile::UserProfile,
             repositories::user::repository::UserRepository,
             services::{
                 cache::{common::CacheServiceType, service::RedisCacheService},

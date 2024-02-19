@@ -7,7 +7,8 @@ use crate::{
             session::{NewSessionData, Session},
             session_metadata::SessionMetadata,
             session_tokens::SessionTokens,
-            user::{User, UserProfile},
+            user::User,
+            user_profile::UserProfile,
         },
         repositories::user::repository::UserRepository,
         services::{
@@ -132,7 +133,7 @@ impl UserService {
             );
             // TODO: adjust session logic
             // in general:
-            // it should return to client session token only which is uuid_v4 now
+            // it should return to client session key
             // on this step:
             // - in case it has incompleted token it should to find user by profile
             // - if user exists the user data(which it sets in storage and reflect in cache
@@ -199,5 +200,19 @@ impl UserService {
             .remove_sessions_by_session(session)
             .await?;
         Ok(())
+    }
+
+    pub async fn find_user_by_email_or_phone(
+        &self,
+        email: &Option<String>,
+        phone: &Option<String>,
+    ) -> Result<Option<User>, UserServiceError> {
+        let mut result: Option<User> = None;
+        if let Some(email) = email.to_owned() {
+            result = self.user_repository.find_user_by_email(&email).await?;
+        } else if let Some(phone) = phone.to_owned() {
+            result = self.user_repository.find_user_by_phone(&phone).await?;
+        }
+        Ok(result)
     }
 }

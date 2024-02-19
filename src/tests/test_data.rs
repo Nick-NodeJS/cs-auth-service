@@ -6,7 +6,8 @@ use crate::app::models::{
     session_metadata::SessionMetadata,
     session_tokens::SessionTokens,
     token::Token,
-    user::{GoogleProfile, User, UserProfile},
+    user::User,
+    user_profile::{GoogleProfile, UserProfile},
 };
 
 pub struct TestData {
@@ -21,7 +22,7 @@ impl TestData {
             name: String::from("fake_google_user_name"),
             email: String::from("fake_google_user_email@gmail.com"),
             email_verified: true,
-            picture: String::from("http://localhost"),
+            picture: Some(String::from("http://localhost")),
         };
 
         // We need to keep uniq Google user_id

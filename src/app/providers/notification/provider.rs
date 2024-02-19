@@ -2,14 +2,15 @@ use crate::app::{providers::error::ProviderError, services::common::AsyncFn};
 
 use super::common::{EMAIL, MOBILE};
 
+//TODO: integrates with 3rd party to send registration emails and phone messages
 pub struct NotificationProvider {
-    async_http_request: Box<dyn AsyncFn>,
+    // async_http_request: Box<dyn AsyncFn>,
 }
 
 impl NotificationProvider {
     pub fn new(request: Box<dyn AsyncFn>) -> Self {
         NotificationProvider {
-            async_http_request: request,
+            // async_http_request: request,
         }
     }
 

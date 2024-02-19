@@ -8,7 +8,7 @@ use oauth2::{HttpRequest, PkceCodeChallenge};
 use crate::app::models::session_metadata::SessionMetadata;
 use crate::app::models::session_tokens::SessionTokens;
 use crate::app::models::token::Token;
-use crate::app::models::user::FacebookProfile;
+use crate::app::models::user_profile::FacebookProfile;
 use crate::app::providers::common::{get_login_cache_data_by_state, LoginCacheData};
 use crate::app::services::cache::service::RedisCacheService;
 use crate::app::services::common::{get_x_www_form_headers, AsyncFn};

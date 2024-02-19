@@ -4,14 +4,20 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Clone)]
 pub struct AppConfig {
+    pub app_id: String,
     pub auth_callback_url: String,
     pub server_address: String,
     pub server_port: u16,
+    pub jwt_access_token_ttl_sec: i64,
+    pub jwt_refresh_token_ttl_sec: i64,
+    pub jwt_secret: String,
 }
 
 impl AppConfig {
     pub fn new() -> Self {
         dotenv().ok();
+
+        let app_id = dotenv::var("APP_ID").expect("APP_ID environment variable is not set");
 
         let server_address =
             dotenv::var("SERVER_ADDRESS").expect("SERVER_ADDRESS environment variable is not set");
@@ -34,8 +40,25 @@ impl AppConfig {
         let auth_callback_url = dotenv::var("AUTH_CALLBACK_URL")
             .expect("Missing the AUTH_CALLBACK_URL environment variable.");
 
+        let jwt_access_token_ttl_sec = dotenv::var("ACCESS_TOKEN_TTL_SEC")
+            .expect("ACCESS_TOKEN_TTL_SEC environment variable is not set")
+            .parse()
+            .expect("Invalid ACCESS_TOKEN_TTL_SEC");
+
+        let jwt_refresh_token_ttl_sec = dotenv::var("REFRESH_TOKEN_TTL_SEC")
+            .expect("REFRESH_TOKEN_TTL_SEC environment variable is not set")
+            .parse()
+            .expect("Invalid REFRESH_TOKEN_TTL_SEC");
+
+        let jwt_secret =
+            dotenv::var("JWT_SECRET").expect("JWT_SECRET environment variable is not set");
+
         Self {
+            app_id,
             auth_callback_url,
+            jwt_access_token_ttl_sec,
+            jwt_refresh_token_ttl_sec,
+            jwt_secret,
             server_address,
             server_port,
             // Add other configuration settings here

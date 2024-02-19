@@ -16,23 +16,18 @@ use super::{
 
 #[derive(Debug, Error)]
 pub enum AppError {
-    // #[response(reason = "Internal service error")]
     #[error("Lock Mutex error")]
     LockError,
 
-    // #[response(reason = "Internal service error")]
     #[error("{0}")]
     ProviderError(#[from] ProviderError),
 
-    // #[response(reason = "Internal service error")]
     #[error("{0}")]
     UserServiceError(#[from] UserServiceError),
 
-    // #[response(reason = "Internal service error")]
     #[error("{0}")]
     StorageServiceError(#[from] StorageServiceError),
 
-    // #[response(reason = "Internal service error")]
     #[error("{0}")]
     CacheServiceError(#[from] CacheServiceError),
 
@@ -60,9 +55,4 @@ impl error::ResponseError for AppError {
             .insert_header(ContentType::json())
             .json(error_as_json(self.to_string().as_ref()))
     }
-    // fn status_code(&self) -> StatusCode {
-    //     match *self {
-    //         UserError::ValidationError { .. } => StatusCode::BAD_REQUEST,
-    //     }
-    // }
 }

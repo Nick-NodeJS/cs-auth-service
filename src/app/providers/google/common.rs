@@ -1,12 +1,13 @@
 use std::fmt::{self};
 
 use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, Algorithm, DecodingKey, TokenData, Validation};
+use jsonwebtoken::DecodingKey;
 use serde::{Deserialize, Serialize};
 
 use crate::app::{
     models::{session_tokens::SessionTokens, token::Token},
     providers::error::ProviderError,
+    shared::jwt::decoding_key_from_cert,
 };
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -100,35 +101,13 @@ pub fn get_session_tokens(tokens: GoogleTokenResponse) -> SessionTokens {
     }
 }
 
-pub fn decode_token(
-    token: &str,
-    key: &DecodingKey,
-    check_expiration: bool,
-) -> Result<TokenClaims, ProviderError> {
-    // Validation configuration
-    let mut validation = Validation::new(Algorithm::RS256);
-    if !check_expiration {
-        validation.validate_exp = false;
-    }
-
-    let token_data: TokenData<TokenClaims> = match decode(token, key, &validation) {
-        Ok(data) => data,
-        Err(err) => {
-            log::warn!("Decode Error: {}\n token: {}\n", err, token);
-            return Err(ProviderError::JWTDecodingError);
-        }
-    };
-
-    Ok(token_data.claims)
-}
-
 pub fn get_decoding_key_from_vec_cert(
     certs: Vec<GoogleCert>,
     kid: String,
 ) -> Result<Option<DecodingKey>, ProviderError> {
     let cert = certs.clone().into_iter().find(|c| c.kid == kid);
     if let Some(certificate) = cert {
-        let key = DecodingKey::from_rsa_components(&certificate.n, &certificate.e)?;
+        let key = decoding_key_from_cert(&certificate.n, &certificate.e)?;
         Ok(Some(key.clone()))
     } else {
         log::error!(

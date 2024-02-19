@@ -7,7 +7,7 @@ use crate::app::{
     app_data::AppData,
     app_error::AppError,
     handlers::common::response::{SUCCESS, USER_SHOULD_RELOGIN},
-    models::user::UserProfile,
+    models::user_profile::UserProfile,
     providers::common::parse_callback_query_string,
     services::common::{error_as_json, result_as_json},
 };
