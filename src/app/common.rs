@@ -1,15 +1,6 @@
-// use std::rc::Rc;
+use actix_web::{error, Error, HttpRequest, HttpResponse};
 
-// use actix_web::dev::ServiceResponse;
-// use actix_web::middleware::ErrorHandlerResponse;
-// use actix_web::{
-//     dev, error, http, web, App, Error, HttpRequest, HttpResponse, ResponseError, Result,
-// };
-// use awc::{ClientResponse, MessageBody, ResponseBody};
-// use futures::FutureExt;
-// use serde_json::{json, Value};
-
-// use super::services::common::error_as_json;
+use super::services::common::error_as_json;
 
 pub mod api_path {
     pub const API: &str = "/api";
@@ -27,28 +18,11 @@ pub mod api_path {
 
 //TODO: implement default error handler
 
-// pub fn default_error_handler<B>(
-//     mut res: dev::ServiceResponse<B>,
-// ) -> Result<ErrorHandlerResponse<B>> {
-//     res.response_mut().headers_mut().insert(
-//         http::header::CONTENT_TYPE,
-//         http::header::HeaderValue::from_static("Service Error"),
-//     );
-//     //res = HttpResponse::BadRequest().json(error_as_json("bad request"));
-//     let (req, res) = res.into_parts();
-//     // let (_, body) = res.into_parts();
-//     // let message_body = ResponseBody::(body);
-//     let res = HttpResponse::BadRequest().json(json!({"error": "error message"}));
-//     let res = ServiceResponse::new(req, res).map_into_left_body();
-
-//     //ErrorHandlerResponse::Response(res)
-//     //error::InternalError::from_response(Err("Fuck!!!"), res)
-//     error::InternalError::from_response("dsfzsd", HttpResponse::Conflict().finish()).into()
-// }
-
-// |res| {
-//     let (req, res) = res.into_parts();
-//     let res = res.set_body(json!({"error":"error message"}));
-//     let res = ServiceResponse::new(req, res);
-//     Ok(actix_web::middleware::ErrorHandlerResponse::Response(res))
-// }
+pub fn error_handler(err: actix_web_validator::Error, _: &HttpRequest) -> Error {
+    let bs = format!("{}", &err);
+    error::InternalError::from_response(
+        err,
+        HttpResponse::BadRequest().json(error_as_json(bs.as_ref())),
+    )
+    .into()
+}

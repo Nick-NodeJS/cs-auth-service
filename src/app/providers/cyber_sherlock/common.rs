@@ -32,9 +32,8 @@ pub fn check_email_and_phone(
     phone: &Option<String>,
 ) -> Result<(), ValidationError> {
     if email.is_none() && phone.is_none() {
-        let error = "Must have `email` or `phone` field";
-        log::warn!("RegisterQueryData validation error: {}", error);
-        return Err(ValidationError::new(error));
+        let error_code = "Must have `email` or `phone` field";
+        return Err(ValidationError::new(error_code));
     }
     Ok(())
 }

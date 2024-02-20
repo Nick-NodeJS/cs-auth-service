@@ -32,14 +32,7 @@ pub enum AppError {
     CacheServiceError(#[from] CacheServiceError),
 
     #[error("{0}")]
-    ValidationError(String),
-}
-
-impl From<ValidationError> for AppError {
-    fn from(err: ValidationError) -> Self {
-        log::debug!("Validation error: {}", &err);
-        return AppError::ValidationError(err.to_string());
-    }
+    ValidationError(#[from] ValidationError),
 }
 
 impl<T> From<PoisonError<T>> for AppError {

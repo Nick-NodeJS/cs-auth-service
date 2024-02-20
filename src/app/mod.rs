@@ -10,12 +10,13 @@ pub mod services;
 pub mod shared;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_web_validator::JsonConfig;
 
 use crate::app::app_data::AppData;
 use crate::app::common::api_path::{
     API, AUTH, CALLBACK, CYBER_SHERLOCK, FACEBOOK, GOOGLE, LOGIN, LOGOUT, REGISTER, STATUS, V1,
 };
-// use crate::app::common::default_error_handler;
+use crate::app::common::error_handler;
 use crate::app::handlers::logout::logout;
 use crate::app::middlewares::session::SessionMiddleware;
 use crate::app::services::cache::common::CacheServiceType;
@@ -64,9 +65,9 @@ pub async fn run() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            // .wrap(ErrorHandlers::new().handler(StatusCode::BAD_REQUEST, default_error_handler))
             .wrap(Logger::default())
             .app_data(web::Data::new(app_data.clone()))
+            .app_data(JsonConfig::default().error_handler(error_handler))
             .service(
                 web::scope(API).service(
                     web::scope(V1)

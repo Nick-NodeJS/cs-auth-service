@@ -55,7 +55,6 @@ pub async fn login(
             };
         };
         return Ok(HttpResponse::Unauthorized().json(error_as_json(WRONG_CREDENTIALS)));
-    } else {
-        return Ok(HttpResponse::Unauthorized().json(error_as_json(NO_USER_FOUND)));
-    };
+    }
+    return Ok(HttpResponse::Unauthorized().json(error_as_json(NO_USER_FOUND)));
 }
