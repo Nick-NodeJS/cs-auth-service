@@ -9,6 +9,8 @@ use crate::app::{
 use actix_web::{web, HttpResponse};
 use actix_web_validator::Json;
 
+//TODO: debug user register flow. Seems it creates extra sessions with not generated tokens
+
 /// return Google Auth URL as json
 pub async fn register(
     app_data: web::Data<AppData>,

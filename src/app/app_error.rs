@@ -1,7 +1,6 @@
 use std::sync::PoisonError;
 
-use actix_web::{error, http::header::ContentType, HttpResponse};
-// use actix_web_thiserror_derive::ResponseError;
+use actix_web::{error, http::header::ContentType, Error, HttpRequest, HttpResponse};
 use log::error;
 use thiserror::Error;
 use validator::ValidationError;
@@ -48,4 +47,13 @@ impl error::ResponseError for AppError {
             .insert_header(ContentType::json())
             .json(error_as_json(self.to_string().as_ref()))
     }
+}
+
+//TODO: implement default error handler
+
+pub fn error_handler(err: actix_web_validator::Error, _: &HttpRequest) -> Error {
+    let bs = format!("{}", &err);
+    // Validation error response as json
+    let response = HttpResponse::BadRequest().json(error_as_json(bs.as_ref()));
+    error::InternalError::from_response(err, response).into()
 }

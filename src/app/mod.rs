@@ -13,10 +13,10 @@ use actix_web::{middleware::Logger, web, App, HttpServer};
 use actix_web_validator::JsonConfig;
 
 use crate::app::app_data::AppData;
+use crate::app::app_error::error_handler;
 use crate::app::common::api_path::{
     API, AUTH, CALLBACK, CYBER_SHERLOCK, FACEBOOK, GOOGLE, LOGIN, LOGOUT, REGISTER, STATUS, V1,
 };
-use crate::app::common::error_handler;
 use crate::app::handlers::logout::logout;
 use crate::app::middlewares::session::SessionMiddleware;
 use crate::app::services::cache::common::CacheServiceType;
