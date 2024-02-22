@@ -6,7 +6,7 @@ use redis::{ErrorKind, FromRedisValue, RedisError, RedisResult, Value as RedisVa
 use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationError};
 
-use crate::app::models::session_metadata::SessionMetadata;
+use crate::app::models::session::Session;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AccessTokenClaims {
@@ -73,7 +73,7 @@ impl LoginQueryData {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RegisterCacheData {
     pub pkce_code_verifier: String,
-    pub session_metadata: SessionMetadata,
+    pub session: Session,
     pub hash: String,
     pub email: Option<String>,
     pub phone: Option<String>,

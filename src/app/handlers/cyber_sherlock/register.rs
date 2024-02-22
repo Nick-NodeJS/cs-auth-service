@@ -32,8 +32,7 @@ pub async fn register(
     // Generate the authorization URL and params to verify it in next
     let mut cyber_sherlock_auth_provider = app_data.cyber_sherlock_auth_provider.lock()?;
 
-    let auth_url =
-        cyber_sherlock_auth_provider.get_authorization_url(&query_data, session.metadata)?;
+    let auth_url = cyber_sherlock_auth_provider.get_authorization_url(&query_data, session)?;
 
     Ok(HttpResponse::Ok().json(auth_url_as_json(&auth_url)))
 }

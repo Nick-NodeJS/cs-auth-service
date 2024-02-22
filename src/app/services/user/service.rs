@@ -202,6 +202,16 @@ impl UserService {
         Ok(())
     }
 
+    pub async fn remove_anonymous_session(
+        &mut self,
+        session: Session,
+    ) -> Result<(), UserServiceError> {
+        self.session_service
+            .remove_session_by_id(&session.id)
+            .await?;
+        Ok(())
+    }
+
     pub async fn find_user_by_email_or_phone(
         &self,
         email: &Option<String>,

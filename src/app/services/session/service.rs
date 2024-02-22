@@ -79,6 +79,16 @@ impl SessionService {
         Ok(())
     }
 
+    pub async fn remove_session_by_id(
+        &mut self,
+        session_id: &str,
+    ) -> Result<(), SessionServiceError> {
+        self.repository
+            .remove_session_by_key(Session::get_session_key(&session_id))
+            .await?;
+        Ok(())
+    }
+
     pub fn set_cookie_session_id(
         config: &CookieConfiguration,
         response_head: &mut ResponseHead,

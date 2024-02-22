@@ -99,7 +99,7 @@ where
                             &session_key,
                             err
                         );
-                        // it has an issue to get Session from CacheStorage by Session Key
+                        // it didn't get Session from CacheStorage by Session Key
                         // set an anonymous Session
                         Session::get_anonymous_session(Some(request_ref))
                     }
@@ -114,7 +114,9 @@ where
             let is_restricted = req.path().contains(LOGOUT) && !session.is_anonymous();
 
             let mut res = service.call(req).await?;
-
+            //
+            // Everything after the call
+            //
             // TODO: set anonymous session on response if it has no session
             let m_res = res.response_mut();
             let session_cookie = m_res

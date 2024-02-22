@@ -5,8 +5,8 @@ use url::Url;
 use crate::{
     app::{
         models::{
-            session_metadata::SessionMetadata, session_tokens::SessionTokens, token::Token,
-            user::User, user_profile::CyberSherlockProfile,
+            session::Session, session_tokens::SessionTokens, token::Token, user::User,
+            user_profile::CyberSherlockProfile,
         },
         providers::{error::ProviderError, notification::provider::NotificationProvider},
         services::cache::service::RedisCacheService,
@@ -44,7 +44,7 @@ impl CyberSherlockAuthProvider {
     pub fn get_authorization_url(
         &mut self,
         register_query_data: &RegisterQueryData,
-        session_metadata: SessionMetadata,
+        session: Session,
     ) -> Result<String, ProviderError> {
         // Create a PKCE code verifier and SHA-256 encode it as a code challenge.
         let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
@@ -54,9 +54,9 @@ impl CyberSherlockAuthProvider {
             &[("state", pkce_code_verifier.secret().to_string())],
         )?;
         // set auth data to cache
-        let login_cache_data = RegisterCacheData {
+        let register_cache_data = RegisterCacheData {
             pkce_code_verifier: pkce_code_verifier.secret().to_string(),
-            session_metadata,
+            session,
             hash: hash_password(register_query_data.password.as_str()).map_err(|_| {
                 ProviderError::CyberSherlockAuthProviderError(
                     CyberSherlockAuthProviderError::Argon2PassHashError,
@@ -65,7 +65,7 @@ impl CyberSherlockAuthProvider {
             email: register_query_data.email.clone(),
             phone: register_query_data.phone.clone(),
         };
-        self.set_auth_data_to_cache(code, &login_cache_data)?;
+        self.set_auth_data_to_cache(code, &register_cache_data)?;
 
         self.send_auth_code(code, register_query_data)?;
         Ok(auth_url.to_string())

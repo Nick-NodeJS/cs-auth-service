@@ -4,9 +4,7 @@ use actix_web::web;
 use redis::{ErrorKind, FromRedisValue, RedisError, RedisResult, Value as RedisValue};
 use serde::{Deserialize, Serialize};
 
-use crate::app::{
-    models::session_metadata::SessionMetadata, services::cache::service::RedisCacheService,
-};
+use crate::app::{models::session::Session, services::cache::service::RedisCacheService};
 
 use super::error::ProviderError;
 
@@ -44,7 +42,7 @@ pub fn parse_callback_query_string(query_string: &str) -> Result<CallbackQueryDa
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LoginCacheData {
     pub pkce_code_verifier: String,
-    pub session_metadata: SessionMetadata,
+    pub session: Session,
 }
 
 impl FromRedisValue for LoginCacheData {

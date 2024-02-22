@@ -43,7 +43,7 @@ pub async fn auth_callback(
         .get_user_session(
             tokens,
             UserProfile::CyberSherlock(user_profile.clone()),
-            register_cache_data.session_metadata,
+            register_cache_data.session.metadata.clone(),
         )
         .await?
     {
@@ -53,6 +53,9 @@ pub async fn auth_callback(
         );
         let mut response = HttpResponse::Ok().json(result_as_json(SUCCESS));
         user_service.set_session_cookie(response.head_mut(), &user_session)?;
+        user_service
+            .remove_anonymous_session(register_cache_data.session)
+            .await?;
 
         Ok(response)
     } else {

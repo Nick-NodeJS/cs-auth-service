@@ -17,7 +17,7 @@ pub async fn login(
     // set auth data in cache
     let login_cache_data = LoginCacheData {
         pkce_code_verifier,
-        session_metadata: session.metadata,
+        session,
     };
     google_provider.set_auth_data_to_cache(csrf_state.secret().as_ref(), &login_cache_data)?;
 
