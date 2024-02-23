@@ -79,12 +79,17 @@ impl SessionService {
         Ok(())
     }
 
-    pub async fn remove_session_by_id(
+    pub async fn remove_sessions(
         &mut self,
-        session_id: &str,
+        sessions: Vec<Session>,
     ) -> Result<(), SessionServiceError> {
+        //TODO: remove duplicates
+        let session_keys_to_remove: Vec<String> = sessions
+            .into_iter()
+            .map(|s| Session::get_session_key(&s.id))
+            .collect();
         self.repository
-            .remove_session_by_key(Session::get_session_key(&session_id))
+            .remove_sessions_by_keys(session_keys_to_remove)
             .await?;
         Ok(())
     }

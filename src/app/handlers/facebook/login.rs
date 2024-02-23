@@ -4,7 +4,7 @@ use crate::app::{
 };
 use actix_web::{web, HttpResponse};
 
-/// return Google Auth URL as json
+/// return Facebook Auth URL as json
 pub async fn login(
     app_data: web::Data<AppData>,
     session: Session,

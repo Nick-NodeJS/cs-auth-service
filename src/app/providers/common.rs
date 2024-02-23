@@ -28,7 +28,7 @@ pub fn parse_callback_query_string(query_string: &str) -> Result<CallbackQueryDa
             if let Some(state_string) = params.get("state") {
                 state = state_string.to_owned();
             } else {
-                return Err(ProviderError::CodeParamError);
+                return Err(ProviderError::StateParamError);
             };
             return Ok(CallbackQueryData { code, state });
         }

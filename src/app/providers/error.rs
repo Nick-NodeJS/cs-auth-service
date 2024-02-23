@@ -54,6 +54,9 @@ pub enum ProviderError {
     #[error("Invalid code paramater error")]
     CodeParamError,
 
+    #[error("Invalid state paramater error")]
+    StateParamError,
+
     #[error("Error to parse Url string")]
     UrlParseError,
 

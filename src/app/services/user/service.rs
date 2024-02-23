@@ -202,12 +202,12 @@ impl UserService {
         Ok(())
     }
 
-    pub async fn remove_anonymous_session(
+    pub async fn remove_anonymous_sessions(
         &mut self,
-        session: Session,
+        sessions: Vec<Session>,
     ) -> Result<(), UserServiceError> {
         self.session_service
-            .remove_session_by_id(&session.id)
+            .remove_sessions(sessions.into_iter().filter(|s| s.is_anonymous()).collect())
             .await?;
         Ok(())
     }

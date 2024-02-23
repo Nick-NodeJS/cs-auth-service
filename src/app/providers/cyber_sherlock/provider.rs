@@ -57,6 +57,7 @@ impl CyberSherlockAuthProvider {
         let register_cache_data = RegisterCacheData {
             pkce_code_verifier: pkce_code_verifier.secret().to_string(),
             session,
+            //TODO: investigate how to optimize pwd hashing to decrease operation time
             hash: hash_password(register_query_data.password.as_str()).map_err(|_| {
                 ProviderError::CyberSherlockAuthProviderError(
                     CyberSherlockAuthProviderError::Argon2PassHashError,

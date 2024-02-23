@@ -7,7 +7,7 @@ use crate::app::{
     app_data::AppData,
     app_error::AppError,
     handlers::common::response::{SUCCESS, USER_SHOULD_RELOGIN},
-    models::user_profile::UserProfile,
+    models::{session::Session, user_profile::UserProfile},
     providers::common::parse_callback_query_string,
     services::common::{error_as_json, result_as_json},
 };
@@ -15,6 +15,7 @@ use crate::app::{
 pub async fn auth_callback(
     req: HttpRequest,
     app_data: web::Data<AppData>,
+    session: Session,
 ) -> Result<HttpResponse, AppError> {
     let mut google_provider = app_data.google_provider.lock()?;
     let mut user_service = app_data.user_service.lock()?;
@@ -50,7 +51,7 @@ pub async fn auth_callback(
         let mut response = HttpResponse::Ok().json(result_as_json(SUCCESS));
         user_service.set_session_cookie(response.head_mut(), &user_session)?;
         user_service
-            .remove_anonymous_session(login_cache_data.session)
+            .remove_anonymous_sessions(vec![login_cache_data.session, session])
             .await?;
 
         Ok(response)

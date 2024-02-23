@@ -9,15 +9,13 @@ use crate::app::{
 use actix_web::{web, HttpResponse};
 use actix_web_validator::Json;
 
-//TODO: debug user register flow. Seems it creates extra sessions with not generated tokens
-
-/// return Google Auth URL as json
+/// return CyberSherlock Auth URL as json
 pub async fn register(
     app_data: web::Data<AppData>,
     query_data: Json<RegisterQueryData>,
     session: Session,
 ) -> Result<HttpResponse, AppError> {
-    // TODO: implement error handler to have always json body format in response
+    //TODO: check if it possible validate on request query parsing step
     query_data.validate()?;
 
     // Check if user with the credentials exists
