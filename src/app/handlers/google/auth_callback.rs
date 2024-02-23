@@ -6,7 +6,8 @@ use actix_web::{
 use crate::app::{
     app_data::AppData,
     app_error::AppError,
-    models::user::UserProfile,
+    handlers::common::response::{SUCCESS, USER_SHOULD_RELOGIN},
+    models::{session::Session, user_profile::UserProfile},
     providers::common::parse_callback_query_string,
     services::common::{error_as_json, result_as_json},
 };
@@ -14,6 +15,7 @@ use crate::app::{
 pub async fn auth_callback(
     req: HttpRequest,
     app_data: web::Data<AppData>,
+    session: Session,
 ) -> Result<HttpResponse, AppError> {
     let mut google_provider = app_data.google_provider.lock()?;
     let mut user_service = app_data.user_service.lock()?;
@@ -37,7 +39,7 @@ pub async fn auth_callback(
         .get_user_session(
             tokens.clone(),
             UserProfile::Google(user_profile.clone()),
-            login_cache_data.session_metadata,
+            login_cache_data.session.metadata.clone(),
         )
         .await?
     {
@@ -46,13 +48,16 @@ pub async fn auth_callback(
             &user_session.user_id
         );
         // TODO: set session token to cookie
-        let mut response = HttpResponse::Ok().json(result_as_json("success"));
+        let mut response = HttpResponse::Ok().json(result_as_json(SUCCESS));
         user_service.set_session_cookie(response.head_mut(), &user_session)?;
+        user_service
+            .remove_anonymous_sessions(vec![login_cache_data.session, session])
+            .await?;
 
         Ok(response)
     } else {
         log::warn!(
-            "\nGoogle user_id: {} has no data in system. Should relogin\n",
+            "\nGoogle user_id: {} has no data in system. Should relogin to Google\n",
             user_profile.user_id
         );
         if let Some(token) = tokens.extra_token {
@@ -61,8 +66,6 @@ pub async fn auth_callback(
                 .await?;
         }
         // TODO: investigate if it's better for UX to pass throw login to return auth_url on this step
-        return Ok(
-            HttpResponse::Unauthorized().json(error_as_json("User should relogin to Google"))
-        );
+        return Ok(HttpResponse::Unauthorized().json(error_as_json(USER_SHOULD_RELOGIN)));
     }
 }

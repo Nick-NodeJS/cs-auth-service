@@ -7,12 +7,15 @@ pub mod models;
 pub mod providers;
 pub mod repositories;
 pub mod services;
+pub mod shared;
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_web_validator::JsonConfig;
 
 use crate::app::app_data::AppData;
+use crate::app::app_error::error_handler;
 use crate::app::common::api_path::{
-    API, AUTH, CALLBACK, FACEBOOK, GOOGLE, LOGIN, LOGOUT, STATUS, V1,
+    API, AUTH, CALLBACK, CYBER_SHERLOCK, FACEBOOK, GOOGLE, LOGIN, LOGOUT, REGISTER, STATUS, V1,
 };
 use crate::app::handlers::logout::logout;
 use crate::app::middlewares::session::SessionMiddleware;
@@ -23,6 +26,10 @@ use crate::config::session_config::SessionConfig;
 use env_logger::Env;
 use log::info;
 
+use crate::app::handlers::cyber_sherlock::{
+    auth_callback::auth_callback as cyber_sherlock_auth_callback,
+    login::login as login_with_cyber_sherlock, register::register as cyber_sherlock_register,
+};
 use crate::app::handlers::facebook::{
     auth_callback::auth_callback as facebook_auth_callback, login::login as login_with_facebook,
 };
@@ -60,6 +67,7 @@ pub async fn run() -> std::io::Result<()> {
         App::new()
             .wrap(Logger::default())
             .app_data(web::Data::new(app_data.clone()))
+            .app_data(JsonConfig::default().error_handler(error_handler))
             .service(
                 web::scope(API).service(
                     web::scope(V1)
@@ -69,6 +77,15 @@ pub async fn run() -> std::io::Result<()> {
                         ))
                         .service(
                             web::scope(AUTH)
+                                .service(
+                                    web::scope(CYBER_SHERLOCK)
+                                        .route(LOGIN, web::post().to(login_with_cyber_sherlock))
+                                        .route(
+                                            CALLBACK,
+                                            web::get().to(cyber_sherlock_auth_callback),
+                                        )
+                                        .route(REGISTER, web::post().to(cyber_sherlock_register)),
+                                )
                                 .service(
                                     web::scope(FACEBOOK)
                                         .route(LOGIN, web::get().to(login_with_facebook))

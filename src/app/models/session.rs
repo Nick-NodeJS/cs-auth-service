@@ -27,7 +27,7 @@ pub struct NewSessionData {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Session {
-    anonimous: bool,
+    pub anonimous: bool,
     pub auth_provider: AuthProviders,
     pub user_id: ObjectId,
     pub id: String,

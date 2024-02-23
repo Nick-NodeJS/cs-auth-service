@@ -1,5 +1,7 @@
 use actix_web::HttpResponse;
 
+use super::common::response::SUCCESS;
+
 pub async fn status() -> HttpResponse {
-  HttpResponse::Ok().body("Status cs-auth-service ok!\n")
+    HttpResponse::Ok().body(SUCCESS)
 }

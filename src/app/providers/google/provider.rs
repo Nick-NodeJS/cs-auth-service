@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use actix_web::http::Method;
 use awc::error::HeaderValue;
-use base64::Engine;
+//TODO: remove jsonwebtoken dependency to shared(jwt)
 use jsonwebtoken as jwt;
 use jwt::DecodingKey;
 use oauth2::http::HeaderMap;
@@ -17,17 +17,18 @@ use oauth2::{
 
 use crate::app::models::session_tokens::SessionTokens;
 use crate::app::models::token::Token;
-use crate::app::models::user::GoogleProfile;
+use crate::app::models::user_profile::GoogleProfile;
 use crate::app::providers::common::{get_login_cache_data_by_state, LoginCacheData};
-use crate::app::providers::google::common::decode_token;
+use crate::app::providers::google::common::TokenClaims;
 use crate::app::services::cache::service::RedisCacheService;
 use crate::app::services::common::{async_http_request, get_x_www_form_headers, AsyncFn};
+use crate::app::shared::jwt::decode_token;
 use crate::config::google_config::GoogleConfig;
 
 use super::super::error::ProviderError;
 use super::common::{
     get_decoding_key_from_vec_cert, get_session_tokens, GoogleCert, GoogleKeys,
-    GoogleTokenResponse, TokenHeaderObject, UserInfo,
+    GoogleTokenResponse, UserInfo,
 };
 use super::error::GoogleProviderError;
 
@@ -185,18 +186,16 @@ impl GoogleProvider {
         token: &str,
     ) -> Result<Option<DecodingKey>, ProviderError> {
         let token_string = token.to_string();
-        let token_parts: Vec<&str> = token_string.split('.').collect();
-        let header = match token_parts.into_iter().next() {
-            Some(header) => header,
+        let header = jsonwebtoken::decode_header(&token_string)?;
+        let kid = match header.kid {
+            Some(k) => k,
             None => {
                 log::warn!("Bad token, no header found. Token: {}", token_string);
                 return Err(ProviderError::BadTokenStructure);
             }
         };
-        let decoded_slice = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(header)?;
-        let header_object = serde_json::from_slice::<TokenHeaderObject>(&decoded_slice)?;
         let google_certs = self.get_certificates().await?;
-        let decoding_key = get_decoding_key_from_vec_cert(google_certs, header_object.kid)?;
+        let decoding_key = get_decoding_key_from_vec_cert(google_certs, kid)?;
         Ok(decoding_key)
     }
 
@@ -218,7 +217,7 @@ impl GoogleProvider {
                 return self.get_user_profile_on_gapi(&access_token).await;
             }
         };
-        let token_data = decode_token(&access_token, &key, true)?;
+        let token_data = decode_token::<TokenClaims>(&access_token, &key, true)?;
         log::debug!("\nToken data: {:?}\n", token_data);
 
         Ok(GoogleProfile {
@@ -226,7 +225,7 @@ impl GoogleProvider {
             name: token_data.name,
             email: token_data.email,
             email_verified: token_data.email_verified,
-            picture: token_data.picture,
+            picture: Some(token_data.picture),
         })
     }
 
@@ -258,7 +257,7 @@ impl GoogleProvider {
             name: user_info.name,
             email: user_info.email,
             email_verified: user_info.email_verified,
-            picture: user_info.picture,
+            picture: Some(user_info.picture),
         });
     }
 

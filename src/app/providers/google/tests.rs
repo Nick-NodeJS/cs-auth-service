@@ -3,7 +3,9 @@ mod tests {
     use env_logger::Env;
     use jsonwebtoken::DecodingKey;
 
-    use super::super::common::decode_token as google_service_decode_token;
+    use crate::app::{
+        providers::google::common::TokenClaims, shared::jwt::decode_token as decode_google_token,
+    };
 
     #[test]
     /*
@@ -27,7 +29,7 @@ mod tests {
 
         // need to disable expiration checking if token outdated
         // locally you can set fresh token + key and enable it
-        match google_service_decode_token(&token, &key, false) {
+        match decode_google_token::<TokenClaims>(&token, &key, false) {
             Ok(token_data) => {
                 println!("Decoded token data: {:?}\n {}", token_data, token);
                 assert_eq!(token_data.aud, google_client_id);

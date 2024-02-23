@@ -79,6 +79,21 @@ impl SessionService {
         Ok(())
     }
 
+    pub async fn remove_sessions(
+        &mut self,
+        sessions: Vec<Session>,
+    ) -> Result<(), SessionServiceError> {
+        //TODO: remove duplicates
+        let session_keys_to_remove: Vec<String> = sessions
+            .into_iter()
+            .map(|s| Session::get_session_key(&s.id))
+            .collect();
+        self.repository
+            .remove_sessions_by_keys(session_keys_to_remove)
+            .await?;
+        Ok(())
+    }
+
     pub fn set_cookie_session_id(
         config: &CookieConfiguration,
         response_head: &mut ResponseHead,
@@ -122,7 +137,7 @@ impl SessionService {
         let cookies = match request.cookies().ok() {
             Some(c) => c,
             None => {
-                log::warn!("No cookies on request, ignoring...");
+                log::debug!("No cookies on request, ignoring...");
 
                 return None;
             }
@@ -130,7 +145,7 @@ impl SessionService {
         let session_cookie = match cookies.iter().find(|&cookie| cookie.name() == config.name) {
             Some(c) => c,
             None => {
-                log::warn!("No session cookie on request, ignoring...");
+                log::debug!("No session cookie on request, ignoring...");
 
                 return None;
             }

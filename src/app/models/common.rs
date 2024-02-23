@@ -25,6 +25,7 @@ impl FromStr for AuthProviders {
         match s.to_lowercase().as_str() {
             "google" => Ok(AuthProviders::Google),
             "facebook" => Ok(AuthProviders::Facebook),
+            "cybersherlock" => Ok(AuthProviders::CyberSherlock),
             _ => Err("Invalid AuthProvider"),
         }
     }

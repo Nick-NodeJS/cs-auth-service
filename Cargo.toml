@@ -33,6 +33,9 @@ derivative = "2.2.0"
 uuid = { version = "1.6.1", features = ["v4", "fast-rng"] }
 rand = "0.8.5"
 futures = "0.3.30"
+argon2 = "0.5.3"
+actix-web-validator = "5.0.1"
+validator = { version = "0.16.1", features = ["derive", "phone"] }
 
 # [[test]]
 # name = "test"

@@ -5,10 +5,10 @@ use actix_web::http::Method;
 use oauth2::url::Url;
 use oauth2::{HttpRequest, PkceCodeChallenge};
 
-use crate::app::models::session_metadata::SessionMetadata;
+use crate::app::models::session::Session;
 use crate::app::models::session_tokens::SessionTokens;
 use crate::app::models::token::Token;
-use crate::app::models::user::FacebookProfile;
+use crate::app::models::user_profile::FacebookProfile;
 use crate::app::providers::common::{get_login_cache_data_by_state, LoginCacheData};
 use crate::app::services::cache::service::RedisCacheService;
 use crate::app::services::common::{get_x_www_form_headers, AsyncFn};
@@ -42,7 +42,7 @@ impl FacebookProvider {
 
     pub fn get_authorization_url_data(
         &mut self,
-        session_metadata: SessionMetadata,
+        session: Session,
     ) -> Result<String, ProviderError> {
         // Create a PKCE code verifier and SHA-256 encode it as a code challenge.
         let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
@@ -63,10 +63,10 @@ impl FacebookProvider {
             ],
         )?;
 
-        // set auth data in cache
+        // set auth data to cache
         let login_cache_data = LoginCacheData {
             pkce_code_verifier: pkce_code_verifier.secret().to_string(),
-            session_metadata,
+            session,
         };
         self.set_auth_data_to_cache(pkce_code_challenge.as_str(), &login_cache_data)?;
 

@@ -4,9 +4,7 @@ use actix_web::web;
 use redis::{ErrorKind, FromRedisValue, RedisError, RedisResult, Value as RedisValue};
 use serde::{Deserialize, Serialize};
 
-use crate::app::{
-    models::session_metadata::SessionMetadata, services::cache::service::RedisCacheService,
-};
+use crate::app::{models::session::Session, services::cache::service::RedisCacheService};
 
 use super::error::ProviderError;
 
@@ -30,7 +28,7 @@ pub fn parse_callback_query_string(query_string: &str) -> Result<CallbackQueryDa
             if let Some(state_string) = params.get("state") {
                 state = state_string.to_owned();
             } else {
-                return Err(ProviderError::CodeParamError);
+                return Err(ProviderError::StateParamError);
             };
             return Ok(CallbackQueryData { code, state });
         }
@@ -44,10 +42,8 @@ pub fn parse_callback_query_string(query_string: &str) -> Result<CallbackQueryDa
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LoginCacheData {
     pub pkce_code_verifier: String,
-    pub session_metadata: SessionMetadata,
+    pub session: Session,
 }
-
-impl LoginCacheData {}
 
 impl FromRedisValue for LoginCacheData {
     fn from_redis_value(value: &RedisValue) -> RedisResult<LoginCacheData> {

@@ -47,16 +47,27 @@ impl SessionRepository {
         )?;
         Ok(())
     }
+
     pub async fn remove_sessions(
         &mut self,
         user_sessions_key: &str,
         session_keys: Vec<String>,
     ) -> Result<(), SessionRepositoryError> {
-        dbg!(user_sessions_key, &session_keys);
         // TODO: implement user sessions in cache array updating in parallel(in one step) with session deleting
-        self.storage.delete_values(session_keys.clone())?;
-        self.storage
-            .delete_set_values(user_sessions_key, session_keys)?;
+        if session_keys.len() > 0 {
+            self.storage.delete_values(session_keys.clone())?;
+            self.storage
+                .delete_set_values(user_sessions_key, session_keys)?;
+        }
+        Ok(())
+    }
+
+    pub async fn remove_sessions_by_keys(
+        &mut self,
+        session_keys: Vec<String>,
+    ) -> Result<(), SessionRepositoryError> {
+        // TODO: implement user sessions in cache array updating in parallel(in one step) with session deleting
+        self.storage.delete_values(session_keys)?;
         Ok(())
     }
 }

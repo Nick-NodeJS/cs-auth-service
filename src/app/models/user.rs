@@ -10,55 +10,16 @@ use serde_json::json;
 
 use crate::app::services::storage::service::CollectionType;
 
-use super::common::{datetime_as_mongo_bson, AuthProviders};
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CyberSherlockProfile {
-    pub user_id: String,
-    pub name: String,
-    pub email: String,
-    pub email_verified: bool,
-    pub picture: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct GoogleProfile {
-    pub user_id: String,
-    pub name: String,
-    pub email: String,
-    pub email_verified: bool,
-    pub picture: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct FacebookProfile {
-    pub user_id: String,
-    pub name: String,
-    pub email: Option<String>,
-    pub picture: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum UserProfile {
-    CyberSherlock(CyberSherlockProfile),
-    Google(GoogleProfile),
-    Facebook(FacebookProfile),
-}
-
-impl UserProfile {
-    pub fn get_provider(profile: &UserProfile) -> AuthProviders {
-        match profile {
-            UserProfile::Google(_) => AuthProviders::Google,
-            UserProfile::Facebook(_) => AuthProviders::Facebook,
-            _ => AuthProviders::CyberSherlock,
-        }
-    }
-}
+use super::{
+    common::{datetime_as_mongo_bson, AuthProviders},
+    user_profile::{CyberSherlockProfile, FacebookProfile, GoogleProfile, UserProfile},
+};
+pub type UserId = ObjectId;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
     #[serde(rename = "_id")]
-    pub id: ObjectId,
+    pub id: UserId,
     pub active_profile: AuthProviders,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cybersherlock: Option<CyberSherlockProfile>,
@@ -76,7 +37,7 @@ impl User {
     pub fn new(profile: UserProfile) -> User {
         let now = Utc::now();
         let mut user = User {
-            id: ObjectId::new(),
+            id: User::generate_user_id(),
             active_profile: AuthProviders::CyberSherlock,
             cybersherlock: None,
             google: None,
@@ -87,7 +48,6 @@ impl User {
         match profile {
             UserProfile::CyberSherlock(cyber_sherlock_profile) => {
                 user.cybersherlock = Some(cyber_sherlock_profile);
-                user.active_profile = AuthProviders::CyberSherlock;
             }
             UserProfile::Google(google_profile) => {
                 user.google = Some(google_profile);
@@ -102,6 +62,9 @@ impl User {
     }
     pub fn get_user_cache_key(user_id: &str) -> String {
         format!("user::{}", user_id)
+    }
+    pub fn generate_user_id() -> UserId {
+        ObjectId::new()
     }
 }
 
