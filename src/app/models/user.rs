@@ -6,7 +6,7 @@ use redis::{
     Value as RedisValue,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::app::services::storage::service::CollectionType;
 
@@ -22,7 +22,7 @@ pub struct User {
     pub id: UserId,
     pub active_profile: AuthProviders,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cybersherlock: Option<CyberSherlockProfile>,
+    pub cyber_sherlock: Option<CyberSherlockProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub google: Option<GoogleProfile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -39,7 +39,7 @@ impl User {
         let mut user = User {
             id: User::generate_user_id(),
             active_profile: AuthProviders::CyberSherlock,
-            cybersherlock: None,
+            cyber_sherlock: None,
             google: None,
             facebook: None,
             created_at: now,
@@ -47,7 +47,9 @@ impl User {
         };
         match profile {
             UserProfile::CyberSherlock(cyber_sherlock_profile) => {
-                user.cybersherlock = Some(cyber_sherlock_profile);
+                // CyberSherlock profile has system user id
+                user.id = cyber_sherlock_profile.user_id.clone();
+                user.cyber_sherlock = Some(cyber_sherlock_profile);
             }
             UserProfile::Google(google_profile) => {
                 user.google = Some(google_profile);
@@ -60,9 +62,35 @@ impl User {
         }
         user
     }
+
+    pub fn to_json_with_hash(&self) -> Value {
+        json!({
+            // Need to keep underscore `_id` because of MongoDB usage
+            "_id": self.id,
+            "active_profile": self.active_profile,
+            "cyber_sherlock": self.cyber_sherlock,
+            "google": self.google,
+            "facebook": self.facebook,
+            "created_at": self.created_at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+            "updated_at": self.updated_at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        })
+    }
+    pub fn to_json(&self) -> Value {
+        let cyber_sherlock = match &self.cyber_sherlock {
+            None => Value::Null,
+            Some(cyber_sherlock_profile) => cyber_sherlock_profile.to_json(),
+        };
+        let mut json_user = self.to_json_with_hash();
+        if self.cyber_sherlock.is_some() {
+            *json_user.get_mut("cyber_sherlock").unwrap() = cyber_sherlock;
+        }
+        json_user
+    }
+
     pub fn get_user_cache_key(user_id: &str) -> String {
         format!("user::{}", user_id)
     }
+
     pub fn generate_user_id() -> UserId {
         ObjectId::new()
     }
@@ -75,20 +103,7 @@ impl ToRedisArgs for User {
     where
         W: ?Sized + RedisWrite,
     {
-        out.write_arg(
-            json!({
-                // Need to keep underscore `_id` because of MongoDB usage
-                "_id": self.id,
-                "active_profile": self.active_profile,
-                "cybersherlock": self.cybersherlock,
-                "google": self.google,
-                "facebook": self.facebook,
-                "created_at": self.created_at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-                "updated_at": self.updated_at.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-            })
-            .to_string()
-            .as_bytes(),
-        );
+        out.write_arg(self.to_json_with_hash().to_string().as_bytes());
     }
 }
 

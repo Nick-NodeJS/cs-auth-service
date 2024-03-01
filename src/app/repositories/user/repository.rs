@@ -37,7 +37,11 @@ impl UserRepository {
         if let Some(user) = self.get_user_by_id_from_cache(user_id)? {
             return Ok(Some(user));
         };
-        self.get_user_by_id_from_storage(user_id).await
+        let user_from_storage = self.get_user_by_id_from_storage(user_id).await?;
+        if let Some(user) = user_from_storage.clone() {
+            self.set_user_in_cache(&user)?;
+        }
+        Ok(user_from_storage)
     }
 
     pub async fn find_user_by_email(

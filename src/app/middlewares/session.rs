@@ -78,7 +78,6 @@ where
         let configuration = Rc::clone(&self.configuration);
 
         Box::pin(async move {
-            // TODO: update session middleware logic to keep anonymous user sessions on every endpoint
             let session: Session;
             let (request_ref, _) = req.parts();
             if let Some(session_key) =
@@ -111,19 +110,19 @@ where
 
             req.extensions_mut().insert(session.clone());
             // Need to exclude only once the case when user /logout
-            let is_restricted = req.path().contains(LOGOUT) && !session.is_anonymous();
+            let is_restricted_endpoint_call =
+                req.path().contains(LOGOUT) && !session.is_anonymous();
 
             let mut res = service.call(req).await?;
             //
             // Everything after the call
             //
-            // TODO: set anonymous session on response if it has no session
             let m_res = res.response_mut();
             let session_cookie = m_res
                 .cookies()
                 .into_iter()
                 .find(|cookie| cookie.name() == &configuration.cookie_config.name);
-            if session_cookie.is_none() && !is_restricted {
+            if session_cookie.is_none() && !is_restricted_endpoint_call {
                 if let Err(err) = storage
                     .as_ref()
                     .set(&session, configuration.session_ttl_sec)

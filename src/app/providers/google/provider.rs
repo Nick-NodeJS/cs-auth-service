@@ -272,7 +272,7 @@ impl GoogleProvider {
 
     pub async fn revoke_token(&self, token: &str) -> Result<(), ProviderError> {
         let mut url = Url::parse(&self.config.google_revoke_url).expect("parse url error");
-        url.set_query(Some(format!("token={}", token.clone()).as_ref()));
+        url.set_query(Some(format!("token={}", token).as_ref()));
         let revoke_response = match async_http_request(HttpRequest {
             method: Method::POST,
             url,

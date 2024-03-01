@@ -44,7 +44,6 @@ impl Session {
             anonimous: session_data.anonimous,
             auth_provider: session_data.auth_provider,
             user_id: session_data.user_id,
-            // TODO: update session_id generation according to actix-web example
             id: Session::generate_session_id(),
             tokens: session_data.tokens,
             metadata: session_data.session_metadata,
