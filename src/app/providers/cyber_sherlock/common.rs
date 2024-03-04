@@ -37,6 +37,11 @@ pub fn check_email_and_phone(
     }
     Ok(())
 }
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Credentials {
+    pub email: Option<String>,
+    pub phone: Option<String>,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, Validate)]
 pub struct RegisterQueryData {
@@ -53,6 +58,12 @@ impl RegisterQueryData {
     pub fn validate(&self) -> Result<(), ValidationError> {
         check_email_and_phone(&self.email, &self.phone)
     }
+    pub fn to_credentials(&self) -> Credentials {
+        Credentials {
+            email: self.email.clone(),
+            phone: self.phone.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Validate)]
@@ -67,6 +78,12 @@ pub struct LoginQueryData {
 impl LoginQueryData {
     pub fn validate(&self) -> Result<(), ValidationError> {
         check_email_and_phone(&self.email, &self.phone)
+    }
+    pub fn to_credentials(&self) -> Credentials {
+        Credentials {
+            email: self.email.clone(),
+            phone: self.phone.clone(),
+        }
     }
 }
 

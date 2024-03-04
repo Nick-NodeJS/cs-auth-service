@@ -5,7 +5,7 @@ use url::Url;
 use crate::{
     app::{
         models::{
-            session::Session, session_tokens::SessionTokens, token::Token, user::User,
+            session::Session, session_tokens::SessionTokens, token::Token,
             user_profile::CyberSherlockProfile,
         },
         providers::{error::ProviderError, notification::provider::NotificationProvider},
@@ -174,7 +174,7 @@ impl CyberSherlockAuthProvider {
         user_data: &RegisterCacheData,
     ) -> Result<CyberSherlockProfile, ProviderError> {
         let user_profile = CyberSherlockProfile {
-            user_id: User::generate_user_id(),
+            user_id: user_data.session.user_id,
             name: String::from(""),
             email: user_data.email.clone(),
             email_verified: false,

@@ -10,6 +10,7 @@ use crate::{
             user::User,
             user_profile::UserProfile,
         },
+        providers::cyber_sherlock::common::Credentials,
         repositories::user::repository::UserRepository,
         services::{
             cache::service::RedisCacheService, session::service::SessionService,
@@ -212,15 +213,14 @@ impl UserService {
         Ok(())
     }
 
-    pub async fn find_user_by_email_or_phone(
+    pub async fn find_user_by_credentials(
         &self,
-        email: &Option<String>,
-        phone: &Option<String>,
+        credentials: &Credentials,
     ) -> Result<Option<User>, UserServiceError> {
         let mut result: Option<User> = None;
-        if let Some(email) = email.to_owned() {
+        if let Some(email) = credentials.email.to_owned() {
             result = self.user_repository.find_user_by_email(&email).await?;
-        } else if let Some(phone) = phone.to_owned() {
+        } else if let Some(phone) = credentials.phone.to_owned() {
             result = self.user_repository.find_user_by_phone(&phone).await?;
         }
         Ok(result)

@@ -3,9 +3,6 @@ use std::str::FromStr;
 
 use actix_web::http::Method;
 use awc::error::HeaderValue;
-//TODO: remove jsonwebtoken dependency to shared(jwt)
-use jsonwebtoken as jwt;
-use jwt::DecodingKey;
 use oauth2::http::HeaderMap;
 
 use oauth2::basic::BasicClient;
@@ -181,24 +178,6 @@ impl GoogleProvider {
         Ok(tokens)
     }
 
-    pub async fn get_token_key(
-        &mut self,
-        token: &str,
-    ) -> Result<Option<DecodingKey>, ProviderError> {
-        let token_string = token.to_string();
-        let header = jsonwebtoken::decode_header(&token_string)?;
-        let kid = match header.kid {
-            Some(k) => k,
-            None => {
-                log::warn!("Bad token, no header found. Token: {}", token_string);
-                return Err(ProviderError::BadTokenStructure);
-            }
-        };
-        let google_certs = self.get_certificates().await?;
-        let decoding_key = get_decoding_key_from_vec_cert(google_certs, kid)?;
-        Ok(decoding_key)
-    }
-
     pub async fn get_user_profile(
         &mut self,
         token: Option<Token>,
@@ -207,12 +186,26 @@ impl GoogleProvider {
             Some(token) => token.token_string,
             None => return Err(ProviderError::BadTokenStructure),
         };
-        let key = match self.get_token_key(access_token.clone().as_ref()).await? {
-            Some(decoding_key) => decoding_key,
+
+        // Get DecodingKey
+        let header = jsonwebtoken::decode_header(&access_token)?;
+        let kid = match header.kid {
+            Some(k) => k,
+            None => {
+                log::warn!("Bad token, no header found. Token: {}", &access_token);
+                return Err(ProviderError::BadTokenStructure);
+            }
+        };
+        let google_certs = self.get_certificates().await?;
+        let decoding_key = get_decoding_key_from_vec_cert(google_certs, kid)?;
+
+        // Get Google user profile
+        let key = match decoding_key {
+            Some(d_key) => d_key,
             None => {
                 log::warn!(
                     "No decoding key for token: {}\n Trying to get user profile on GAPI...",
-                    access_token
+                    &access_token
                 );
                 return self.get_user_profile_on_gapi(&access_token).await;
             }

@@ -44,6 +44,7 @@ impl UserRepository {
         Ok(user_from_storage)
     }
 
+    // Update it to have extra option to filter by provider
     pub async fn find_user_by_email(
         &self,
         email: &str,
@@ -196,10 +197,10 @@ fn get_update_user_profile_query(user_profile: UserProfile) -> Document {
     let mut data_to_update = match user_profile {
         UserProfile::CyberSherlock(cyber_sherlock_profile) => {
             doc! {
-                "cybersherlock.name": cyber_sherlock_profile.name,
-                "cybersherlock.email": cyber_sherlock_profile.email,
-                "cybersherlock.email_verified": cyber_sherlock_profile.email_verified,
-                "cybersherlock.picture": cyber_sherlock_profile.picture,
+                "cyber_sherlock.name": cyber_sherlock_profile.name,
+                "cyber_sherlock.email": cyber_sherlock_profile.email,
+                "cyber_sherlock.email_verified": cyber_sherlock_profile.email_verified,
+                "cyber_sherlock.picture": cyber_sherlock_profile.picture,
             }
         }
         UserProfile::Google(google_profile) => {
@@ -226,7 +227,7 @@ fn get_find_user_by_profile_query(user_profile: UserProfile) -> Document {
     let mut query = doc! {};
     match user_profile {
         UserProfile::CyberSherlock(cyber_sherlock_profile) => {
-            query.insert("cybersherlock.user_id", cyber_sherlock_profile.user_id);
+            query.insert("cyber_sherlock.user_id", cyber_sherlock_profile.user_id);
         }
         UserProfile::Google(google_profile) => {
             query.insert("google.user_id", google_profile.user_id);
@@ -249,7 +250,7 @@ fn get_find_user_by_email_query(email: &str) -> Document {
     doc! {
         "$or": [
             doc! {
-                "cybersherlock.email": email
+                "cyber_sherlock.email": email
             },
             doc! {
                 "google.email": email
@@ -263,6 +264,6 @@ fn get_find_user_by_email_query(email: &str) -> Document {
 
 fn get_find_user_by_phone_query(phone: &str) -> Document {
     doc! {
-        "cybersherlock.phone": phone
+        "cyber_sherlock.phone": phone
     }
 }

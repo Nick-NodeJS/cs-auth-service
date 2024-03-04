@@ -66,8 +66,9 @@ impl SessionRepository {
         &mut self,
         session_keys: Vec<String>,
     ) -> Result<(), SessionRepositoryError> {
-        // TODO: implement user sessions in cache array updating in parallel(in one step) with session deleting
-        self.storage.delete_values(session_keys)?;
+        if session_keys.len() > 0 {
+            self.storage.delete_values(session_keys)?;
+        }
         Ok(())
     }
 }
