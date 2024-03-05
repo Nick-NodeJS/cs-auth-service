@@ -6,6 +6,7 @@ use serde::Deserialize;
 pub struct AppConfig {
     pub app_id: String,
     pub auth_callback_url: String,
+    pub cache_state_ttl_sec: u64,
     pub server_address: String,
     pub server_port: u16,
     pub jwt_access_token_ttl_sec: i64,
@@ -53,9 +54,15 @@ impl AppConfig {
         let jwt_secret =
             dotenv::var("JWT_SECRET").expect("JWT_SECRET environment variable is not set");
 
+        let cache_state_ttl_sec: u64 = dotenv::var("CACHE_STATE_TTL_SEC")
+            .expect("CACHE_STATE_TTL_SEC environment variable is not set")
+            .parse()
+            .expect("Invalid CACHE_STATE_TTL_SEC");
+
         Self {
             app_id,
             auth_callback_url,
+            cache_state_ttl_sec,
             jwt_access_token_ttl_sec,
             jwt_refresh_token_ttl_sec,
             jwt_secret,

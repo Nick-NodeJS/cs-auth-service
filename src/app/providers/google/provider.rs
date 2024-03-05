@@ -118,9 +118,9 @@ impl GoogleProvider {
         csrf_state: &str,
         login_cache_data: &LoginCacheData,
     ) -> Result<(), ProviderError> {
-        self.cache_service.set_value_with_ttl::<String>(
+        self.cache_service.set_value_with_ttl(
             csrf_state,
-            RedisCacheService::struct_to_cache_string(login_cache_data)?,
+            login_cache_data,
             self.config.google_cache_state_ttl_sec,
         )?;
         Ok(())
@@ -300,7 +300,7 @@ impl GoogleProvider {
         let expired_duration = expires.signed_duration_since(now).num_seconds();
         self.cache_service.set_value_with_ttl(
             &self.config.google_cache_certs_key,
-            serde_json::to_string(&certificates)?,
+            &certificates,
             expired_duration as u64,
         )?;
         Ok(())

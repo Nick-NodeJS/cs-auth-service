@@ -32,15 +32,6 @@ pub async fn auth_callback(
         &register_cache_data.pkce_code_verifier,
         &callback_query_data.state,
     )?;
-
-    if user_service
-        .get_user_by_id(&register_cache_data.session.user_id)
-        .await?
-        .is_some()
-    {
-        return Ok(HttpResponse::BadRequest().json(error_as_json(USER_SHOULD_RELOGIN)));
-    }
-
     //TODO:
     // - implement uniq key on user storage or other logic to avoid email or phone duplicates
 

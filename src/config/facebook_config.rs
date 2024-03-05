@@ -36,10 +36,10 @@ impl FacebookConfig {
             .expect("Missing the FACEBOOK_REDIRECT_URL environment variable.");
         let facebook_graph_url = dotenv::var("FACEBOOK_GRAPH_URL")
             .expect("Missing the FACEBOOK_GRAPH_URL environment variable.");
-        let facebook_cache_state_ttl_sec: u64 = dotenv::var("FACEBOOK_STATE_CACHE_TTL_SEC")
-            .expect("FACEBOOK_STATE_CACHE_TTL_SEC environment variable is not set")
+        let facebook_cache_state_ttl_sec: u64 = dotenv::var("FACEBOOK_CACHE_STATE_TTL_SEC")
+            .expect("FACEBOOK_CACHE_STATE_TTL_SEC environment variable is not set")
             .parse()
-            .expect("Invalid FACEBOOK_STATE_CACHE_TTL_SEC");
+            .expect("Invalid FACEBOOK_CACHE_STATE_TTL_SEC");
 
         // Validate TTL in milliseconds to keep Facebook OAuth2 state in Redis
         // make sense to keep it not more than 3 min

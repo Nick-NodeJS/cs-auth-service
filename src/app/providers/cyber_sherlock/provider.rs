@@ -77,13 +77,8 @@ impl CyberSherlockAuthProvider {
         key: &str,
         data: &RegisterCacheData,
     ) -> Result<(), ProviderError> {
-        // TODO: add to app config auth code cache ttl
-        let cache_ttl = 300 as u64;
-        self.cache_service.set_value_with_ttl(
-            key,
-            RedisCacheService::struct_to_cache_string(data)?,
-            cache_ttl,
-        )?;
+        self.cache_service
+            .set_value_with_ttl(key, data, self.config.cache_state_ttl_sec)?;
         Ok(())
     }
 
@@ -114,6 +109,8 @@ impl CyberSherlockAuthProvider {
         let data = self.cache_service.get_value::<RegisterCacheData>(code)?;
         log::debug!("{:?}", &data);
         if let Some(register_data) = data {
+            // delete cache register data to avoid using it again
+            self.cache_service.delete_values(vec![code.to_string()])?;
             return Ok(register_data);
         }
         Err(ProviderError::CallbackStateCacheError)

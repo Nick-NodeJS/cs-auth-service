@@ -100,16 +100,32 @@ impl RedisCacheService {
         Ok(values)
     }
 
-    pub fn set_value_with_ttl<T>(
+    // means that data argument impl its own ToRedisArgs logic
+    pub fn set_data_with_ttl<T>(
         &self,
         key: &str,
-        value: T,
+        data: T,
         seconds: u64,
     ) -> Result<(), CacheServiceError>
     where
         T: ToRedisArgs,
     {
         let mut connection = self.get_connection()?;
+        let _: () = connection.set_ex(key, data, seconds)?;
+        Ok(())
+    }
+
+    pub fn set_value_with_ttl<T>(
+        &self,
+        key: &str,
+        data: &T,
+        seconds: u64,
+    ) -> Result<(), CacheServiceError>
+    where
+        T: Serialize,
+    {
+        let mut connection = self.get_connection()?;
+        let value = serde_json::to_string::<T>(data)?;
         let _: () = connection.set_ex(key, value, seconds)?;
         Ok(())
     }

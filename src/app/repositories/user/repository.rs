@@ -128,7 +128,7 @@ impl UserRepository {
     }
 
     fn set_user_in_cache(&mut self, user: &User) -> Result<(), UserRepositoryError> {
-        self.cache.set_value_with_ttl::<User>(
+        self.cache.set_data_with_ttl::<User>(
             &User::get_user_cache_key(user.id.to_string().as_ref()),
             user.to_owned(),
             self.config.user_cache_ttl_sec,
