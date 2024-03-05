@@ -32,7 +32,6 @@ pub async fn auth_callback(
         &register_cache_data.pkce_code_verifier,
         &callback_query_data.state,
     )?;
-
     //TODO:
     // - implement uniq key on user storage or other logic to avoid email or phone duplicates
 

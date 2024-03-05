@@ -39,10 +39,10 @@ impl GoogleConfig {
             .expect("Missing the GOOGLE_CERT_URL environment variable.");
         let google_cache_certs_key = dotenv::var("GOOGLE_CACHE_CERTS_KEY")
             .expect("Missing the GOOGLE_CACHE_CERTS_KEY environment variable.");
-        let google_cache_state_ttl_sec: u64 = dotenv::var("GOOGLE_STATE_CACHE_TTL_SEC")
-            .expect("GOOGLE_STATE_CACHE_TTL_SEC environment variable is not set")
+        let google_cache_state_ttl_sec: u64 = dotenv::var("GOOGLE_CACHE_STATE_TTL_SEC")
+            .expect("GOOGLE_CACHE_STATE_TTL_SEC environment variable is not set")
             .parse()
-            .expect("Invalid GOOGLE_STATE_CACHE_TTL_SEC");
+            .expect("Invalid GOOGLE_CACHE_STATE_TTL_SEC");
 
         // Validate TTL in milliseconds to keep Google OAuth2 state in Redis
         // make sense to keep it not more than 3 min

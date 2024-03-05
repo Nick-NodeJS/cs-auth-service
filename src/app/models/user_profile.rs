@@ -1,5 +1,6 @@
 use bson::doc;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 use super::{common::AuthProviders, user::UserId};
 
@@ -13,6 +14,19 @@ pub struct CyberSherlockProfile {
     pub phone_verified: bool,
     pub picture: Option<String>,
     pub hash: String,
+}
+impl CyberSherlockProfile {
+    pub fn to_json(&self) -> Value {
+        json!({
+            "user_id": self.user_id,
+            "name": self.name,
+            "email": self.email,
+            "email_verified": self.email_verified,
+            "phone": self.phone,
+            "phone_verified": self.phone_verified,
+            "picture": self.picture,
+        })
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

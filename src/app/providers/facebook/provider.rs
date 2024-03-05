@@ -78,9 +78,9 @@ impl FacebookProvider {
         csrf_state: &str,
         login_cache_data: &LoginCacheData,
     ) -> Result<(), ProviderError> {
-        self.cache_service.set_value_with_ttl::<String>(
+        self.cache_service.set_value_with_ttl(
             csrf_state,
-            RedisCacheService::struct_to_cache_string(login_cache_data)?,
+            login_cache_data,
             self.config.facebook_cache_state_ttl_sec,
         )?;
         Ok(())

@@ -12,22 +12,23 @@ use crate::app::{
 use actix_web::{web, HttpResponse};
 use actix_web_validator::Json;
 
+//TODO: check if session is not anonymous
 /// return Google Auth URL as json
 pub async fn login(
     app_data: web::Data<AppData>,
     login_query_data: Json<LoginQueryData>,
     session: Session,
 ) -> Result<HttpResponse, AppError> {
-    // TODO: implement error handler to have always json body format in response
     login_query_data.validate()?;
-    // Find user by login data with CyberSherlock profile
+    // Find user by login data
+    //TODO: with CyberSherlock profile only
     let mut user_service = app_data.user_service.lock()?;
     if let Some(user) = user_service
-        .find_user_by_email_or_phone(&login_query_data.email, &login_query_data.phone)
+        .find_user_by_credentials(&login_query_data.to_credentials())
         .await?
     {
         // validate login data password by profile hash
-        if let Some(cyber_sherlock_profile) = user.cybersherlock {
+        if let Some(cyber_sherlock_profile) = user.cyber_sherlock {
             return match verify_password(&login_query_data.password, &cyber_sherlock_profile.hash) {
                 Ok(_) => {
                     let cyber_sherlock_auth_provider =

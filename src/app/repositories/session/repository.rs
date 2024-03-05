@@ -37,7 +37,7 @@ impl SessionRepository {
     ) -> Result<(), SessionRepositoryError> {
         // TODO: implement user sessions in cache array updating in parallel(in one step) with session setting
         self.storage
-            .set_value_with_ttl::<Session>(session_key, session.clone(), session_ttl)?;
+            .set_data_with_ttl::<Session>(session_key, session.clone(), session_ttl)?;
         self.storage.set(
             &Session::get_user_sessions_key(&session.user_id.to_string()),
             (
@@ -66,8 +66,9 @@ impl SessionRepository {
         &mut self,
         session_keys: Vec<String>,
     ) -> Result<(), SessionRepositoryError> {
-        // TODO: implement user sessions in cache array updating in parallel(in one step) with session deleting
-        self.storage.delete_values(session_keys)?;
+        if session_keys.len() > 0 {
+            self.storage.delete_values(session_keys)?;
+        }
         Ok(())
     }
 }

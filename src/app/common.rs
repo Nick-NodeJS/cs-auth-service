@@ -10,4 +10,6 @@ pub mod api_path {
     pub const LOGOUT: &str = "/logout";
     pub const STATUS: &str = "/status";
     pub const REGISTER: &str = "/register";
+    pub const USER: &str = "/user";
+    pub const ME: &str = "/me";
 }

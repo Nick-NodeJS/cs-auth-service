@@ -63,9 +63,10 @@ pub fn get_login_cache_data_by_state(
     state: &str,
 ) -> Result<LoginCacheData, ProviderError> {
     // process code and state
-    let login_cache_data_value =
-        cache_service.get_value::<LoginCacheData>(state.clone().as_ref())?;
+    let login_cache_data_value = cache_service.get_value::<LoginCacheData>(state.as_ref())?;
     if let Some(login_cache_data) = login_cache_data_value {
+        // delete cache auth data to avoid using it again
+        cache_service.delete_values(vec![state.to_string()])?;
         Ok(login_cache_data)
     } else {
         log::debug!("No callback request state {} in Redis", state);

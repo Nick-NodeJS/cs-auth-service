@@ -3,9 +3,6 @@ use std::str::FromStr;
 
 use actix_web::http::Method;
 use awc::error::HeaderValue;
-//TODO: remove jsonwebtoken dependency to shared(jwt)
-use jsonwebtoken as jwt;
-use jwt::DecodingKey;
 use oauth2::http::HeaderMap;
 
 use oauth2::basic::BasicClient;
@@ -121,9 +118,9 @@ impl GoogleProvider {
         csrf_state: &str,
         login_cache_data: &LoginCacheData,
     ) -> Result<(), ProviderError> {
-        self.cache_service.set_value_with_ttl::<String>(
+        self.cache_service.set_value_with_ttl(
             csrf_state,
-            RedisCacheService::struct_to_cache_string(login_cache_data)?,
+            login_cache_data,
             self.config.google_cache_state_ttl_sec,
         )?;
         Ok(())
@@ -181,24 +178,6 @@ impl GoogleProvider {
         Ok(tokens)
     }
 
-    pub async fn get_token_key(
-        &mut self,
-        token: &str,
-    ) -> Result<Option<DecodingKey>, ProviderError> {
-        let token_string = token.to_string();
-        let header = jsonwebtoken::decode_header(&token_string)?;
-        let kid = match header.kid {
-            Some(k) => k,
-            None => {
-                log::warn!("Bad token, no header found. Token: {}", token_string);
-                return Err(ProviderError::BadTokenStructure);
-            }
-        };
-        let google_certs = self.get_certificates().await?;
-        let decoding_key = get_decoding_key_from_vec_cert(google_certs, kid)?;
-        Ok(decoding_key)
-    }
-
     pub async fn get_user_profile(
         &mut self,
         token: Option<Token>,
@@ -207,12 +186,26 @@ impl GoogleProvider {
             Some(token) => token.token_string,
             None => return Err(ProviderError::BadTokenStructure),
         };
-        let key = match self.get_token_key(access_token.clone().as_ref()).await? {
-            Some(decoding_key) => decoding_key,
+
+        // Get DecodingKey
+        let header = jsonwebtoken::decode_header(&access_token)?;
+        let kid = match header.kid {
+            Some(k) => k,
+            None => {
+                log::warn!("Bad token, no header found. Token: {}", &access_token);
+                return Err(ProviderError::BadTokenStructure);
+            }
+        };
+        let google_certs = self.get_certificates().await?;
+        let decoding_key = get_decoding_key_from_vec_cert(google_certs, kid)?;
+
+        // Get Google user profile
+        let key = match decoding_key {
+            Some(d_key) => d_key,
             None => {
                 log::warn!(
                     "No decoding key for token: {}\n Trying to get user profile on GAPI...",
-                    access_token
+                    &access_token
                 );
                 return self.get_user_profile_on_gapi(&access_token).await;
             }
@@ -272,7 +265,7 @@ impl GoogleProvider {
 
     pub async fn revoke_token(&self, token: &str) -> Result<(), ProviderError> {
         let mut url = Url::parse(&self.config.google_revoke_url).expect("parse url error");
-        url.set_query(Some(format!("token={}", token.clone()).as_ref()));
+        url.set_query(Some(format!("token={}", token).as_ref()));
         let revoke_response = match async_http_request(HttpRequest {
             method: Method::POST,
             url,
@@ -307,7 +300,7 @@ impl GoogleProvider {
         let expired_duration = expires.signed_duration_since(now).num_seconds();
         self.cache_service.set_value_with_ttl(
             &self.config.google_cache_certs_key,
-            serde_json::to_string(&certificates)?,
+            &certificates,
             expired_duration as u64,
         )?;
         Ok(())

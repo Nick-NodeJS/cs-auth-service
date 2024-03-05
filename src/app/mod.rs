@@ -15,9 +15,11 @@ use actix_web_validator::JsonConfig;
 use crate::app::app_data::AppData;
 use crate::app::app_error::error_handler;
 use crate::app::common::api_path::{
-    API, AUTH, CALLBACK, CYBER_SHERLOCK, FACEBOOK, GOOGLE, LOGIN, LOGOUT, REGISTER, STATUS, V1,
+    API, AUTH, CALLBACK, CYBER_SHERLOCK, FACEBOOK, GOOGLE, LOGIN, LOGOUT, ME, REGISTER, STATUS,
+    USER, V1,
 };
 use crate::app::handlers::logout::logout;
+use crate::app::handlers::me::me;
 use crate::app::middlewares::session::SessionMiddleware;
 use crate::app::services::cache::common::CacheServiceType;
 use crate::app::services::cache::service::RedisCacheService;
@@ -97,7 +99,8 @@ pub async fn run() -> std::io::Result<()> {
                                         .route(CALLBACK, web::get().to(google_auth_callback)),
                                 )
                                 .route(LOGOUT, web::get().to(logout)),
-                        ),
+                        )
+                        .service(web::scope(USER).route(ME, web::get().to(me))),
                 ),
             )
             .route(STATUS, web::get().to(status))

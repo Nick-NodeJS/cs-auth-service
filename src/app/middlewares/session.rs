@@ -2,16 +2,20 @@ use std::{future::Future, pin::Pin, rc::Rc};
 
 use actix_utils::future::{ready, Ready};
 use actix_web::{
-    body::MessageBody,
+    body::{EitherBody, MessageBody},
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    HttpMessage,
+    HttpMessage, HttpResponse,
 };
 
 use crate::{
     app::{
-        common::api_path::LOGOUT,
+        common::api_path::{LOGIN, LOGOUT, REGISTER},
+        handlers::common::response::USER_SHOULD_RELOGIN,
         models::session::Session,
-        services::{session::service::SessionService, traits::session_storage::SessionStorage},
+        services::{
+            common::error_as_json, session::service::SessionService,
+            traits::session_storage::SessionStorage,
+        },
     },
     config::session_config::SessionConfig,
 };
@@ -38,7 +42,7 @@ where
     B: MessageBody + 'static,
     Storage: SessionStorage + 'static,
 {
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = actix_web::Error;
     type Transform = InnerSessionMiddleware<S, Storage>;
     type InitError = ();
@@ -65,7 +69,7 @@ where
     S::Future: 'static,
     Storage: SessionStorage + 'static,
 {
-    type Response = ServiceResponse<B>;
+    type Response = ServiceResponse<EitherBody<B>>;
     type Error = actix_web::Error;
     #[allow(clippy::type_complexity)]
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
@@ -78,7 +82,6 @@ where
         let configuration = Rc::clone(&self.configuration);
 
         Box::pin(async move {
-            // TODO: update session middleware logic to keep anonymous user sessions on every endpoint
             let session: Session;
             let (request_ref, _) = req.parts();
             if let Some(session_key) =
@@ -109,21 +112,33 @@ where
                 session = Session::get_anonymous_session(Some(request_ref));
             };
 
+            // To do not create a new not anonymous session when request has it on LOGIN or REGISTER endpoints
+            if !session.is_anonymous()
+                && (req.path().contains(LOGIN) || req.path().contains(REGISTER))
+            {
+                let err_response =
+                    HttpResponse::BadRequest().json(error_as_json(USER_SHOULD_RELOGIN));
+                let (http_req, _) = req.into_parts();
+                let service_err_response = ServiceResponse::new(http_req, err_response);
+                return Ok(service_err_response.map_into_right_body());
+            }
+
             req.extensions_mut().insert(session.clone());
+
             // Need to exclude only once the case when user /logout
-            let is_restricted = req.path().contains(LOGOUT) && !session.is_anonymous();
+            let is_restricted_endpoint_call =
+                req.path().contains(LOGOUT) && !session.is_anonymous();
 
             let mut res = service.call(req).await?;
             //
             // Everything after the call
             //
-            // TODO: set anonymous session on response if it has no session
             let m_res = res.response_mut();
             let session_cookie = m_res
                 .cookies()
                 .into_iter()
                 .find(|cookie| cookie.name() == &configuration.cookie_config.name);
-            if session_cookie.is_none() && !is_restricted {
+            if session_cookie.is_none() && !is_restricted_endpoint_call {
                 if let Err(err) = storage
                     .as_ref()
                     .set(&session, configuration.session_ttl_sec)
@@ -141,7 +156,7 @@ where
                     log::error!("Error to set session cookie to response: {:?}", err);
                 }
             }
-            Ok(res)
+            Ok(res.map_into_left_body())
         })
     }
 }

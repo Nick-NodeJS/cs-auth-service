@@ -21,7 +21,7 @@ pub async fn register(
     // Check if user with the credentials exists
     let user_service = app_data.user_service.lock()?;
     if user_service
-        .find_user_by_email_or_phone(&query_data.email, &query_data.phone)
+        .find_user_by_credentials(&query_data.to_credentials())
         .await?
         .is_some()
     {
